@@ -8,24 +8,24 @@ class BrickBreakerGame {
         this.nextCtx = this.nextLevelCanvas.getContext('2d');
         
         // 游戏配置
-        this.paddleWidth = 120; // 从100增加到120，更容易接球
-        this.paddleHeight = 10;
-        this.paddleY = this.canvas.height - 30;
+        this.paddleWidth = 140; // 从120增加到140，更容易接球
+        this.paddleHeight = 12; // 从10增加到12，更容易接球
+        this.paddleY = this.canvas.height - 35;
         this.paddleX = this.canvas.width / 2 - this.paddleWidth / 2;
-        this.paddleSpeed = 20; // 保持20，响应灵敏
+        this.paddleSpeed = 18; // 从20降到18，更平缓
         
         this.ballRadius = 8;
         this.ballX = this.canvas.width / 2;
         this.ballY = this.canvas.height / 2;
-        this.ballSpeedX = 3.5; // 从4.5降到3.5，更容易控制
-        this.ballSpeedY = -3.5; // 从-4.5降到-3.5
-        this.ballSpeed = 3.5; // 从4.5降到3.5
+        this.ballSpeedX = 3.0; // 从3.5降到3.0，更容易控制
+        this.ballSpeedY = -3.0; // 从-3.5降到-3.0
+        this.ballSpeed = 3.0; // 从3.5降到3.0
         
-        this.brickRows = 4; // 从5行减少到4行，降低难度
-        this.brickCols = 6; // 从7列减少到6列
-        this.brickWidth = 60; // 从55增加到60，更容易击中
+        this.brickRows = 3; // 从4行减少到3行，降低难度
+        this.brickCols = 5; // 从6列减少到5列
+        this.brickWidth = 65; // 从60增加到65，更容易击中
         this.brickHeight = 25;
-        this.brickPadding = 8;
+        this.brickPadding = 10;
         this.brickOffsetTop = 50;
         this.brickOffsetLeft = 20; // 从25降到20，居中显示
         
@@ -46,7 +46,7 @@ class BrickBreakerGame {
         // 游戏状态
         this.score = 0;
         this.level = 1;
-        this.balls = 3;
+        this.balls = 5; // 从3增加到5，增加初始生命值
         this.isRunning = false;
         this.isPaused = false;
         
@@ -282,8 +282,8 @@ class BrickBreakerGame {
             this.level++;
             this.levelEl.textContent = this.level;
             
-            // 增加速度
-            this.ballSpeed *= 1.1;
+            // 增加速度（从1.1倍降到1.05倍，更平缓）
+            this.ballSpeed *= 1.05;
             
             // 重新初始化砖块
             this.initializeBricks();
