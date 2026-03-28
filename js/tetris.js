@@ -397,8 +397,22 @@ class ScoreManager {
   }
 
   saveScore(gameType) {
+    const score = this.getScore();
     if (typeof GameStorage !== 'undefined') {
-      GameStorage.updateScore(gameType, this.score);
+      GameStorage.updateScore(gameType, score);
+    } else {
+      // 直接使用localStorage保存分数
+      const maxScoreKey = `game_${gameType}_maxScore`;
+      const lastPlayedKey = `game_${gameType}_lastPlayed`;
+      
+      // 更新最高分
+      const currentMax = parseInt(localStorage.getItem(maxScoreKey)) || 0;
+      if (score > currentMax) {
+        localStorage.setItem(maxScoreKey, score.toString());
+      }
+      
+      // 更新最后游玩时间
+      localStorage.setItem(lastPlayedKey, Date.now().toString());
     }
   }
 }
