@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>迷你游戏合集</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 迷你游戏合集</h1>
+            <p>经典小游戏，随时随地玩耍</p>
+        </header>
+
+        <main>
+            <div class="games-grid">
+                <div class="game-card" onclick="window.location.href='games/snake.html'">
+                    <div class="game-icon">🐍</div>
+                    <h3>贪吃蛇</h3>
+                    <p>经典贪吃蛇游戏，考验你的反应力</p>
+                    <div class="game-meta">
+                        <span class="difficulty">简单</span>
+                        <span class="controls">键盘方向键</span>
+                    </div>
+                </div>
+
+                <div class="game-card" onclick="window.location.href='games/brick.html'">
+                    <div class="game-icon">🧱</div>
+                    <h3>打砖块</h3>
+                    <p>打掉所有砖块，不要让你的球掉下去</p>
+                    <div class="game-meta">
+                        <span class="difficulty">中等</span>
+                        <span class="controls">键盘左右键</span>
+                    </div>
+                </div>
+
+                <div class="game-card" onclick="window.location.href='games/tetris.html'">
+                    <div class="game-icon">🔲</div>
+                    <h3>俄罗斯方块</h3>
+                    <p>经典的益智游戏，永远不会过时</p>
+                    <div class="game-meta">
+                        <span class="difficulty">中等</span>
+                        <span class="controls">键盘方向键</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <h2>🏆 排行榜</h2>
+                <div id="leaderboard">
+                    <div class="leaderboard-loading">加载中...</div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 迷你游戏合集 | 纯前端实现</p>
+        </footer>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script>
+        // 加载排行榜
+        function loadLeaderboard() {
+            const leaderboardHTML = `
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>游戏</th>
+                            <th>最高分</th>
+                            <th>最后游玩</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody">
+                    </tbody>
+                </table>
+            `;
+            
+            document.getElementById('leaderboard').innerHTML = leaderboardHTML;
+            
+            // 获取所有游戏的最高分
+            const games = ['snake', 'brick', 'tetris'];
+            const tbody = document.getElementById('leaderboardBody');
+            
+            games.forEach(game => {
+                const maxScore = localStorage.getItem(`game_${game}_maxScore`) || 0;
+                const lastPlayed = localStorage.getItem(`game_${game}_lastPlayed`);
+                
+                let lastPlayedText = '从未游玩';
+                if (lastPlayed) {
+                    const date = new Date(parseInt(lastPlayed));
+                    if (!isNaN(date.getTime())) {
+                        lastPlayedText = date.toLocaleDateString();
+                    }
+                }
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${getGameName(game)}</td>
+                    <td>${maxScore}</td>
+                    <td>${lastPlayedText}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function getGameName(game) {
+            const names = {
+                'snake': '🐍 贪吃蛇',
+                'brick': '🧱 打砖块',
+                'tetris': '🔲 俄罗斯方块'
+            };
+            return names[game] || game;
+        }
+        
+        // 页面加载完成后显示排行榜
+        window.addEventListener('load', loadLeaderboard);
+    </script>
+</body>
+</html>
