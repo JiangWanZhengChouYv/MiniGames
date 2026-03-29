@@ -11,6 +11,7 @@
         <header>
             <h1>🎮 迷你游戏合集</h1>
             <p>经典小游戏，随时随地玩耍</p>
+            <button class="btn btn-primary" onclick="showReadme()">📖 显示说明</button>
         </header>
 
         <main>
@@ -83,6 +84,93 @@
         </footer>
     </div>
 
+    <!-- README 模态框 -->
+    <div id="readme-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeReadme()">&times;</span>
+            <h2>📖 游戏说明</h2>
+            <div id="readme-content" class="readme-content">
+                加载中...
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+        }
+        
+        .readme-content {
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        
+        .readme-content h2 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .readme-content h3 {
+            margin-top: 15px;
+            margin-bottom: 8px;
+        }
+        
+        .readme-content ul, .readme-content ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .readme-content code {
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        .readme-content pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin-bottom: 15px;
+        }
+    </style>
+
     <script src="js/storage.js"></script>
     <script>
         // 加载排行榜
@@ -149,6 +237,64 @@
         
         // 页面加载完成后显示排行榜
         window.addEventListener('load', loadLeaderboard);
+        
+        // 显示 README 模态框
+        function showReadme() {
+            const modal = document.getElementById('readme-modal');
+            const content = document.getElementById('readme-content');
+            
+            modal.style.display = 'block';
+            content.innerHTML = '加载中...';
+            
+            // 加载 README.md 文件
+            fetch('README.md')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    // 简单的 Markdown 到 HTML 转换
+                    const html = markdownToHtml(text);
+                    content.innerHTML = html;
+                })
+                .catch(error => {
+                    content.innerHTML = `<p>加载失败: ${error.message}</p><p>请直接查看项目根目录下的 README.md 文件。</p>`;
+                    console.error('Error loading README:', error);
+                });
+        }
+        
+        // 关闭 README 模态框
+        function closeReadme() {
+            const modal = document.getElementById('readme-modal');
+            modal.style.display = 'none';
+        }
+        
+        // 简单的 Markdown 到 HTML 转换
+        function markdownToHtml(markdown) {
+            return markdown
+                .replace(/^# (.*$)/gim, '<h2>$1</h2>')
+                .replace(/^## (.*$)/gim, '<h3>$1</h3>')
+                .replace(/^### (.*$)/gim, '<h4>$1</h4>')
+                .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+                .replace(/`(.*?)`/gim, '<code>$1</code>')
+                .replace(/```([\s\S]*?)```/gim, '<pre>$1</pre>')
+                .replace(/^- (.*$)/gim, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+                .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/s, '<ol>$1</ol>')
+                .replace(/^\s*$\n/gim, '<br>');
+        }
+        
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('readme-modal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
     </script>
 </body>
 </html>
