@@ -830,9 +830,125 @@ class GomokuGame {
                 }
                 
                 console.log('AI训练数据已加载，已分析对局数:', this.aiTraining.totalGamesAnalyzed);
+            } else {
+                // 如果没有训练数据，加载预设的训练数据
+                this.loadDefaultTrainingData();
             }
         } catch (error) {
             console.error('加载AI训练数据失败:', error);
+            // 加载失败时使用预设训练数据
+            this.loadDefaultTrainingData();
+        }
+    }
+    
+    // 加载预设的训练数据
+    loadDefaultTrainingData() {
+        console.log('加载预设训练数据...');
+        
+        // 预设的对弈记录
+        const defaultRecords = [
+            {
+                gameId: 'default_1',
+                startTime: new Date().toISOString(),
+                endTime: new Date().toISOString(),
+                moves: [
+                    { player: 'black', row: 7, col: 7, timestamp: new Date().toISOString(), moveNumber: 1 },
+                    { player: 'white', row: 6, col: 6, timestamp: new Date().toISOString(), moveNumber: 2 },
+                    { player: 'black', row: 8, col: 7, timestamp: new Date().toISOString(), moveNumber: 3 },
+                    { player: 'white', row: 5, col: 5, timestamp: new Date().toISOString(), moveNumber: 4 },
+                    { player: 'black', row: 9, col: 7, timestamp: new Date().toISOString(), moveNumber: 5 },
+                    { player: 'white', row: 4, col: 4, timestamp: new Date().toISOString(), moveNumber: 6 },
+                    { player: 'black', row: 10, col: 7, timestamp: new Date().toISOString(), moveNumber: 7 },
+                    { player: 'white', row: 3, col: 3, timestamp: new Date().toISOString(), moveNumber: 8 },
+                    { player: 'black', row: 11, col: 7, timestamp: new Date().toISOString(), moveNumber: 9 }
+                ],
+                winner: 'black',
+                totalMoves: 9
+            },
+            {
+                gameId: 'default_2',
+                startTime: new Date().toISOString(),
+                endTime: new Date().toISOString(),
+                moves: [
+                    { player: 'black', row: 7, col: 7, timestamp: new Date().toISOString(), moveNumber: 1 },
+                    { player: 'white', row: 7, col: 6, timestamp: new Date().toISOString(), moveNumber: 2 },
+                    { player: 'black', row: 6, col: 7, timestamp: new Date().toISOString(), moveNumber: 3 },
+                    { player: 'white', row: 8, col: 6, timestamp: new Date().toISOString(), moveNumber: 4 },
+                    { player: 'black', row: 5, col: 7, timestamp: new Date().toISOString(), moveNumber: 5 },
+                    { player: 'white', row: 9, col: 6, timestamp: new Date().toISOString(), moveNumber: 6 },
+                    { player: 'black', row: 4, col: 7, timestamp: new Date().toISOString(), moveNumber: 7 },
+                    { player: 'white', row: 10, col: 6, timestamp: new Date().toISOString(), moveNumber: 8 },
+                    { player: 'black', row: 3, col: 7, timestamp: new Date().toISOString(), moveNumber: 9 }
+                ],
+                winner: 'black',
+                totalMoves: 9
+            },
+            {
+                gameId: 'default_3',
+                startTime: new Date().toISOString(),
+                endTime: new Date().toISOString(),
+                moves: [
+                    { player: 'black', row: 6, col: 6, timestamp: new Date().toISOString(), moveNumber: 1 },
+                    { player: 'white', row: 7, col: 7, timestamp: new Date().toISOString(), moveNumber: 2 },
+                    { player: 'black', row: 6, col: 7, timestamp: new Date().toISOString(), moveNumber: 3 },
+                    { player: 'white', row: 7, col: 6, timestamp: new Date().toISOString(), moveNumber: 4 },
+                    { player: 'black', row: 6, col: 8, timestamp: new Date().toISOString(), moveNumber: 5 },
+                    { player: 'white', row: 7, col: 5, timestamp: new Date().toISOString(), moveNumber: 6 },
+                    { player: 'black', row: 6, col: 9, timestamp: new Date().toISOString(), moveNumber: 7 },
+                    { player: 'white', row: 7, col: 4, timestamp: new Date().toISOString(), moveNumber: 8 },
+                    { player: 'black', row: 6, col: 10, timestamp: new Date().toISOString(), moveNumber: 9 }
+                ],
+                winner: 'black',
+                totalMoves: 9
+            },
+            {
+                gameId: 'default_4',
+                startTime: new Date().toISOString(),
+                endTime: new Date().toISOString(),
+                moves: [
+                    { player: 'black', row: 7, col: 7, timestamp: new Date().toISOString(), moveNumber: 1 },
+                    { player: 'white', row: 8, col: 8, timestamp: new Date().toISOString(), moveNumber: 2 },
+                    { player: 'black', row: 6, col: 6, timestamp: new Date().toISOString(), moveNumber: 3 },
+                    { player: 'white', row: 9, col: 9, timestamp: new Date().toISOString(), moveNumber: 4 },
+                    { player: 'black', row: 5, col: 5, timestamp: new Date().toISOString(), moveNumber: 5 },
+                    { player: 'white', row: 10, col: 10, timestamp: new Date().toISOString(), moveNumber: 6 },
+                    { player: 'black', row: 4, col: 4, timestamp: new Date().toISOString(), moveNumber: 7 },
+                    { player: 'white', row: 11, col: 11, timestamp: new Date().toISOString(), moveNumber: 8 },
+                    { player: 'black', row: 3, col: 3, timestamp: new Date().toISOString(), moveNumber: 9 }
+                ],
+                winner: 'black',
+                totalMoves: 9
+            },
+            {
+                gameId: 'default_5',
+                startTime: new Date().toISOString(),
+                endTime: new Date().toISOString(),
+                moves: [
+                    { player: 'black', row: 7, col: 7, timestamp: new Date().toISOString(), moveNumber: 1 },
+                    { player: 'white', row: 8, col: 7, timestamp: new Date().toISOString(), moveNumber: 2 },
+                    { player: 'black', row: 7, col: 6, timestamp: new Date().toISOString(), moveNumber: 3 },
+                    { player: 'white', row: 9, col: 7, timestamp: new Date().toISOString(), moveNumber: 4 },
+                    { player: 'black', row: 7, col: 8, timestamp: new Date().toISOString(), moveNumber: 5 },
+                    { player: 'white', row: 10, col: 7, timestamp: new Date().toISOString(), moveNumber: 6 },
+                    { player: 'black', row: 7, col: 5, timestamp: new Date().toISOString(), moveNumber: 7 },
+                    { player: 'white', row: 11, col: 7, timestamp: new Date().toISOString(), moveNumber: 8 },
+                    { player: 'black', row: 7, col: 4, timestamp: new Date().toISOString(), moveNumber: 9 }
+                ],
+                winner: 'black',
+                totalMoves: 9
+            }
+        ];
+        
+        // 保存预设记录到localStorage
+        try {
+            const compressedRecords = defaultRecords.map(r => this.compressGameRecord(r));
+            localStorage.setItem(this.storageKey, JSON.stringify(compressedRecords));
+            console.log('预设对弈记录已保存');
+            
+            // 对预设数据进行训练
+            this.trainAI();
+        } catch (error) {
+            console.error('保存预设训练数据失败:', error);
         }
     }
     
