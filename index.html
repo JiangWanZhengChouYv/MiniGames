@@ -54,6 +54,16 @@
                         <span class="controls">鼠标左键/右键</span>
                     </div>
                 </div>
+
+                <div class="game-card" onclick="window.location.href='games/gomoku.html'">
+                    <div class="game-icon">⚫</div>
+                    <h3>五子棋</h3>
+                    <p>经典五子棋游戏，人机对战，可选择难度</p>
+                    <div class="game-meta">
+                        <span class="difficulty">中等</span>
+                        <span class="controls">鼠标点击</span>
+                    </div>
+                </div>
             </div>
 
             <div class="stats-section">
@@ -94,7 +104,7 @@
             document.getElementById('leaderboard').innerHTML = leaderboardHTML;
             
             // 获取所有游戏的最高分
-            const games = ['snake', 'brick', 'tetris', 'minesweeper'];
+            const games = ['snake', 'brick', 'tetris', 'minesweeper', 'gomoku'];
             const tbody = document.getElementById('leaderboardBody');
             
             games.forEach(game => {
@@ -131,7 +141,8 @@
                 'snake': '🐍 贪吃蛇',
                 'brick': '🧱 打砖块',
                 'tetris': '🔲 俄罗斯方块',
-                'minesweeper': '💣 扫雷'
+                'minesweeper': '💣 扫雷',
+                'gomoku': '⚫ 五子棋'
             };
             return names[game] || game;
         }
