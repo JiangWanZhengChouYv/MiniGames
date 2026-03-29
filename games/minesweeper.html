@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫雷 - 迷你游戏合集</title>
+    <link rel="stylesheet" href="../css/games.css">
+    <style>
+        .minesweeper-board {
+            display: grid;
+            gap: 1px;
+            background-color: #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 20px auto;
+        }
+        .minesweeper-cell {
+            width: 30px;
+            height: 30px;
+            background-color: #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            border: 2px outset #ccc;
+        }
+        .minesweeper-cell.revealed {
+            background-color: #eee;
+            border: 1px solid #ccc;
+        }
+        .minesweeper-cell.flagged {
+            background-color: #ff9;
+        }
+        .minesweeper-cell.mine {
+            background-color: #f99;
+        }
+        .minesweeper-controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .minesweeper-difficulty {
+            margin: 10px 0;
+        }
+        .minesweeper-stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 10px 0;
+        }
+        .stat {
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <header class="game-header">
+            <h1>💣 扫雷</h1>
+            <p>经典扫雷游戏，考验你的逻辑推理能力！</p>
+        </header>
+
+        <div class="game-info">
+            <div class="info-panel">
+                <h3>游戏状态</h3>
+                <div class="value" id="gameStatus">准备开始</div>
+            </div>
+            <div class="info-panel">
+                <h3>剩余地雷</h3>
+                <div class="value" id="mineCount">0</div>
+            </div>
+            <div class="info-panel">
+                <h3>用时</h3>
+                <div class="value" id="timeElapsed">0</div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>🎮 游戏说明</h3>
+            <ul>
+                <li><kbd>左键</kbd> - 揭开方块</li>
+                <li><kbd>右键</kbd> - 标记地雷</li>
+                <li>数字表示周围8个格子中的地雷数量</li>
+                <li>揭开所有非地雷格子获胜</li>
+                <li>揭开地雷格子游戏结束</li>
+            </ul>
+        </div>
+
+        <div class="minesweeper-controls">
+            <div class="minesweeper-difficulty">
+                <button class="btn btn-secondary" onclick="minesweeperGame.setDifficulty('easy')">简单 (9×9, 10雷)</button>
+                <button class="btn btn-secondary" onclick="minesweeperGame.setDifficulty('medium')">中等 (16×16, 40雷)</button>
+                <button class="btn btn-secondary" onclick="minesweeperGame.setDifficulty('hard')">困难 (30×16, 99雷)</button>
+            </div>
+            <button class="btn btn-primary" onclick="minesweeperGame.startGame()">开始游戏</button>
+            <button class="btn btn-secondary" onclick="window.location.href='../index.html'">返回首页</button>
+        </div>
+
+        <div class="minesweeper-stats">
+            <div class="stat">
+                <h4>最高分</h4>
+                <div id="highScore">0</div>
+            </div>
+            <div class="stat">
+                <h4>最快时间</h4>
+                <div id="bestTime">--:--</div>
+            </div>
+            <div class="stat">
+                <h4>游戏次数</h4>
+                <div id="gameCount">0</div>
+            </div>
+        </div>
+
+        <div class="minesweeper-board" id="minesweeperBoard"></div>
+    </div>
+
+    <div class="game-overlay" id="gameOverlay">
+        <div class="game-over">
+            <h2 id="gameOverTitle">游戏结束！</h2>
+            <p id="gameOverMessage"></p>
+            <p>用时: <span id="finalTime">0</span>秒</p>
+            <button class="btn btn-primary" onclick="minesweeperGame.startGame()">再来一局</button>
+        </div>
+    </div>
+
+    <script src="../js/storage.js"></script>
+    <script src="../js/minesweeper.js"></script>
+</body>
+</html>

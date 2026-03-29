@@ -65,7 +65,7 @@ class GameStorage {
     
     // 获取所有游戏统计数据
     static getAllStats() {
-        const games = ['snake', 'brick', 'tetris'];
+        const games = ['snake', 'brick', 'tetris', 'minesweeper'];
         const stats = {};
         
         games.forEach(game => {
@@ -81,7 +81,7 @@ class GameStorage {
     
     // 重置所有数据
     static resetAll() {
-        const games = ['snake', 'brick', 'tetris'];
+        const games = ['snake', 'brick', 'tetris', 'minesweeper'];
         games.forEach(game => this.clearGameData(game));
     }
 }

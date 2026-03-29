@@ -44,10 +44,24 @@
                         <span class="controls">键盘方向键</span>
                     </div>
                 </div>
+
+                <div class="game-card" onclick="window.location.href='games/minesweeper.html'">
+                    <div class="game-icon">💣</div>
+                    <h3>扫雷</h3>
+                    <p>经典扫雷游戏，考验你的逻辑推理能力</p>
+                    <div class="game-meta">
+                        <span class="difficulty">中等</span>
+                        <span class="controls">鼠标左键/右键</span>
+                    </div>
+                </div>
             </div>
 
             <div class="stats-section">
                 <h2>🏆 排行榜</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span>查看所有游戏的最高分和最后游玩时间</span>
+                    <button class="btn btn-secondary" onclick="loadLeaderboard()">刷新排行榜</button>
+                </div>
                 <div id="leaderboard">
                     <div class="leaderboard-loading">加载中...</div>
                 </div>
@@ -80,7 +94,7 @@
             document.getElementById('leaderboard').innerHTML = leaderboardHTML;
             
             // 获取所有游戏的最高分
-            const games = ['snake', 'brick', 'tetris'];
+            const games = ['snake', 'brick', 'tetris', 'minesweeper'];
             const tbody = document.getElementById('leaderboardBody');
             
             games.forEach(game => {
@@ -89,9 +103,16 @@
                 
                 let lastPlayedText = '从未游玩';
                 if (lastPlayed) {
-                    const date = new Date(parseInt(lastPlayed));
-                    if (!isNaN(date.getTime())) {
-                        lastPlayedText = date.toLocaleDateString();
+                    try {
+                        const timestamp = parseInt(lastPlayed);
+                        if (!isNaN(timestamp)) {
+                            const date = new Date(timestamp);
+                            if (!isNaN(date.getTime())) {
+                                lastPlayedText = date.toLocaleDateString();
+                            }
+                        }
+                    } catch (e) {
+                        console.error('解析最后游玩时间失败:', e);
                     }
                 }
                 
@@ -109,7 +130,8 @@
             const names = {
                 'snake': '🐍 贪吃蛇',
                 'brick': '🧱 打砖块',
-                'tetris': '🔲 俄罗斯方块'
+                'tetris': '🔲 俄罗斯方块',
+                'minesweeper': '💣 扫雷'
             };
             return names[game] || game;
         }
