@@ -47,6 +47,19 @@ class GomokuGame {
             analysis: null
         };
         
+        // 自动学习状态管理
+        this.autoLearnState = {
+            isLearning: false,
+            progress: 0,
+            completedGames: 0,
+            totalGames: 50, // 默认自我对弈50局
+            currentGame: 0,
+            cancelRequested: false,
+            startTime: null,
+            performanceData: [],
+            isPaused: false
+        };
+        
         // 加载训练数据
         this.loadTrainingData();
         
@@ -999,12 +1012,17 @@ class GomokuGame {
         
         // 训练控制按钮
         const trainBtn = document.getElementById('train-ai-btn');
+        const autoLearnBtn = document.getElementById('auto-learn-btn');
         const cancelBtn = document.getElementById('cancel-training-btn');
         const cleanupBtn = document.getElementById('cleanup-btn');
         const closeResultBtn = document.getElementById('close-result-btn');
         
         if (trainBtn) {
             trainBtn.addEventListener('click', () => this.startTraining());
+        }
+        
+        if (autoLearnBtn) {
+            autoLearnBtn.addEventListener('click', () => this.startAutoLearning());
         }
         
         if (cancelBtn) {
@@ -1076,6 +1094,7 @@ class GomokuGame {
     hideTrainingPanel() {
         const panel = document.getElementById('training-panel');
         const trainBtn = document.getElementById('train-ai-btn');
+        const autoLearnBtn = document.getElementById('auto-learn-btn');
         
         if (panel) {
             panel.classList.remove('active');
@@ -1085,6 +1104,407 @@ class GomokuGame {
             trainBtn.disabled = false;
             trainBtn.textContent = '开始训练';
         }
+        
+        if (autoLearnBtn) {
+            autoLearnBtn.disabled = false;
+            autoLearnBtn.textContent = '自动学习';
+        }
+    }
+    
+    // ==================== 自动学习功能 ====================
+    
+    // 开始自动学习
+    startAutoLearning() {
+        if (this.autoLearnState.isLearning) {
+            return;
+        }
+        
+        // 重置自动学习状态
+        this.autoLearnState = {
+            isLearning: true,
+            progress: 0,
+            completedGames: 0,
+            totalGames: 50, // 默认自我对弈50局
+            currentGame: 0,
+            cancelRequested: false,
+            startTime: Date.now(),
+            performanceData: [],
+            isPaused: false
+        };
+        
+        // 显示训练面板
+        this.showTrainingPanel();
+        
+        // 禁用按钮
+        const autoLearnBtn = document.getElementById('auto-learn-btn');
+        if (autoLearnBtn) {
+            autoLearnBtn.disabled = true;
+            autoLearnBtn.textContent = '学习中...';
+        }
+        
+        // 开始自动学习
+        this.performAutoLearning();
+    }
+    
+    // 执行自动学习
+    async performAutoLearning() {
+        const { totalGames } = this.autoLearnState;
+        
+        // 禁用棋盘交互
+        this.setBoardInteraction(false);
+        
+        for (let i = 0; i < totalGames; i++) {
+            // 检查是否请求取消
+            if (this.autoLearnState.cancelRequested) {
+                console.log('自动学习已取消');
+                this.autoLearnState.isLearning = false;
+                this.setBoardInteraction(true);
+                this.hideTrainingPanel();
+                return;
+            }
+            
+            // 检查是否暂停
+            while (this.autoLearnState.isPaused) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            // 更新当前游戏进度
+            this.autoLearnState.currentGame = i + 1;
+            this.autoLearnState.progress = (i / totalGames) * 100;
+            this.updateAutoLearnUI();
+            
+            // 模拟自我对弈
+            const gameResult = await this.simulateSelfGame();
+            
+            // 记录性能数据
+            this.autoLearnState.performanceData.push(gameResult);
+            this.autoLearnState.completedGames++;
+            
+            // 让出时间片，避免阻塞UI
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+        
+        // 完成自动学习
+        this.autoLearnState.isLearning = false;
+        this.autoLearnState.progress = 100;
+        this.updateAutoLearnUI();
+        
+        // 恢复棋盘交互
+        this.setBoardInteraction(true);
+        
+        // 触发AI训练，使用新的自我对弈数据
+        this.trainAI();
+        
+        // 显示学习结果
+        this.showAutoLearnResult();
+        
+        // 隐藏训练面板
+        this.hideTrainingPanel();
+    }
+    
+    // 模拟自我对弈
+    async simulateSelfGame() {
+        // 创建一个临时棋盘
+        const tempBoard = Array(this.boardSize).fill(null).map(() => Array(this.boardSize).fill(null));
+        const moves = [];
+        let currentPlayer = 'black';
+        let gameStatus = 'playing';
+        let winner = null;
+        let moveCount = 0;
+        
+        const startTime = Date.now();
+        
+        // 模拟对局过程
+        while (gameStatus === 'playing' && moveCount < 225) { // 15x15棋盘最多225步
+            // 生成AI落子
+            const move = this.getAIMove(tempBoard, currentPlayer);
+            
+            if (!move) {
+                break; // 没有可用位置
+            }
+            
+            // 落子
+            tempBoard[move.row][move.col] = currentPlayer;
+            moves.push({ 
+                player: currentPlayer, 
+                row: move.row, 
+                col: move.col, 
+                timestamp: new Date().toISOString(),
+                moveNumber: moveCount + 1
+            });
+            
+            moveCount++;
+            
+            // 检查胜负
+            if (this.checkWin(tempBoard, move.row, move.col, currentPlayer)) {
+                winner = currentPlayer;
+                gameStatus = 'ended';
+            } else if (moveCount === 225) {
+                gameStatus = 'ended'; // 平局
+            }
+            
+            // 切换玩家
+            currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+            
+            // 短暂延迟，避免阻塞
+            await new Promise(resolve => setTimeout(resolve, 1));
+        }
+        
+        const endTime = Date.now();
+        
+        // 创建游戏记录
+        const gameRecord = {
+            gameId: `auto_${Date.now()}`,
+            startTime: new Date(startTime).toISOString(),
+            endTime: new Date(endTime).toISOString(),
+            moves: moves,
+            winner: winner,
+            totalMoves: moveCount
+        };
+        
+        // 保存游戏记录
+        this.saveGameRecord(gameRecord);
+        
+        return {
+            gameId: gameRecord.gameId,
+            winner: winner,
+            moveCount: moveCount,
+            duration: endTime - startTime
+        };
+    }
+    
+    // 获取AI落子（用于自我对弈）
+    getAIMove(board, player) {
+        // 简单的AI落子逻辑，基于评分
+        const emptyPositions = [];
+        
+        // 收集所有空位置
+        for (let i = 0; i < this.boardSize; i++) {
+            for (let j = 0; j < this.boardSize; j++) {
+                if (!board[i][j]) {
+                    emptyPositions.push({ row: i, col: j });
+                }
+            }
+        }
+        
+        if (emptyPositions.length === 0) {
+            return null;
+        }
+        
+        // 对每个位置进行评分
+        const scoredPositions = emptyPositions.map(pos => {
+            const score = this.evaluatePosition(board, pos.row, pos.col, player);
+            return { ...pos, score };
+        });
+        
+        // 按评分排序
+        scoredPositions.sort((a, b) => b.score - a.score);
+        
+        // 返回评分最高的位置
+        return scoredPositions[0];
+    }
+    
+    // 评估位置的分数
+    evaluatePosition(board, row, col, player) {
+        let score = 0;
+        const opponent = player === 'black' ? 'white' : 'black';
+        
+        // 模拟落子
+        board[row][col] = player;
+        
+        // 评估当前玩家的优势
+        score += this.evaluateLine(board, row, col, player) * 1.2; // 进攻权重稍高
+        
+        // 评估对手的威胁
+        score += this.evaluateLine(board, row, col, opponent);
+        
+        // 撤销落子
+        board[row][col] = null;
+        
+        // 中心位置奖励
+        const center = Math.floor(this.boardSize / 2);
+        const distanceToCenter = Math.abs(row - center) + Math.abs(col - center);
+        score += (10 - distanceToCenter) * 0.1;
+        
+        return score;
+    }
+    
+    // 评估某位置的线条
+    evaluateLine(board, row, col, player) {
+        let score = 0;
+        const directions = [
+            [1, 0],   // 水平
+            [0, 1],   // 垂直
+            [1, 1],   // 对角线
+            [1, -1]   // 反对角线
+        ];
+        
+        directions.forEach(([dr, dc]) => {
+            let lineScore = 0;
+            let consecutive = 0;
+            let openEnds = 0;
+            
+            // 检查正方向
+            for (let i = 1; i < 5; i++) {
+                const r = row + dr * i;
+                const c = col + dc * i;
+                if (r >= 0 && r < this.boardSize && c >= 0 && c < this.boardSize) {
+                    if (board[r][c] === player) {
+                        consecutive++;
+                    } else if (!board[r][c]) {
+                        openEnds++;
+                        break;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            
+            // 检查反方向
+            for (let i = 1; i < 5; i++) {
+                const r = row - dr * i;
+                const c = col - dc * i;
+                if (r >= 0 && r < this.boardSize && c >= 0 && c < this.boardSize) {
+                    if (board[r][c] === player) {
+                        consecutive++;
+                    } else if (!board[r][c]) {
+                        openEnds++;
+                        break;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            
+            // 根据连续子数和开放端计算分数
+            if (consecutive >= 4) {
+                lineScore = 100000; // 五连
+            } else if (consecutive === 3 && openEnds === 2) {
+                lineScore = 10000; // 活四
+            } else if (consecutive === 3 && openEnds === 1) {
+                lineScore = 1000; // 冲四
+            } else if (consecutive === 2 && openEnds === 2) {
+                lineScore = 1000; // 活三
+            } else if (consecutive === 2 && openEnds === 1) {
+                lineScore = 100; // 眠三
+            } else if (consecutive === 1 && openEnds === 2) {
+                lineScore = 100; // 活二
+            } else if (consecutive === 1 && openEnds === 1) {
+                lineScore = 10; // 眠二
+            }
+            
+            score += lineScore;
+        });
+        
+        return score;
+    }
+    
+    // 更新自动学习UI
+    updateAutoLearnUI() {
+        const progressEl = document.getElementById('training-progress');
+        const progressPercentEl = document.getElementById('progress-percent');
+        const statusEl = document.getElementById('training-status');
+        const statGamesEl = document.getElementById('stat-games');
+        const statPatternsEl = document.getElementById('stat-patterns');
+        
+        if (progressEl) {
+            progressEl.style.width = this.autoLearnState.progress + '%';
+        }
+        
+        if (progressPercentEl) {
+            progressPercentEl.textContent = Math.round(this.autoLearnState.progress) + '%';
+        }
+        
+        if (statGamesEl) {
+            statGamesEl.textContent = this.autoLearnState.completedGames;
+        }
+        
+        if (statPatternsEl) {
+            statPatternsEl.textContent = this.autoLearnState.currentGame;
+        }
+        
+        if (statusEl) {
+            if (this.autoLearnState.isLearning) {
+                statusEl.textContent = `自我对弈中：第 ${this.autoLearnState.currentGame}/${this.autoLearnState.totalGames} 局`;
+            } else if (this.autoLearnState.progress >= 100) {
+                statusEl.textContent = '自动学习完成！';
+            } else {
+                statusEl.textContent = '准备开始自动学习...';
+            }
+        }
+    }
+    
+    // 取消自动学习
+    cancelAutoLearning() {
+        this.autoLearnState.cancelRequested = true;
+    }
+    
+    // 暂停自动学习
+    pauseAutoLearning() {
+        this.autoLearnState.isPaused = true;
+    }
+    
+    // 继续自动学习
+    resumeAutoLearning() {
+        this.autoLearnState.isPaused = false;
+    }
+    
+    // 显示自动学习结果
+    showAutoLearnResult() {
+        const modal = document.getElementById('training-result-modal');
+        const summary = document.getElementById('training-result-summary');
+        
+        if (!modal || !summary) return;
+        
+        const { performanceData, totalGames, startTime } = this.autoLearnState;
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        
+        // 统计数据
+        const blackWins = performanceData.filter(game => game.winner === 'black').length;
+        const whiteWins = performanceData.filter(game => game.winner === 'white').length;
+        const draws = performanceData.filter(game => !game.winner).length;
+        const avgMoves = performanceData.reduce((sum, game) => sum + game.moveCount, 0) / performanceData.length;
+        const avgDuration = performanceData.reduce((sum, game) => sum + game.duration, 0) / performanceData.length;
+        
+        // 生成结果HTML
+        const resultHTML = `
+            <div class="result-item">
+                <span class="result-label">总对局数</span>
+                <span class="result-value">${totalGames}</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">黑子胜</span>
+                <span class="result-value">${blackWins} 局</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">白子胜</span>
+                <span class="result-value">${whiteWins} 局</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">平局</span>
+                <span class="result-value">${draws} 局</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">平均步数</span>
+                <span class="result-value">${avgMoves.toFixed(1)}</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">平均时长</span>
+                <span class="result-value">${(avgDuration / 1000).toFixed(2)}s</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">总耗时</span>
+                <span class="result-value">${(duration / 1000).toFixed(2)}s</span>
+            </div>
+        `;
+        
+        summary.innerHTML = resultHTML;
+        modal.classList.add('active');
     }
     
     // 更新训练UI
