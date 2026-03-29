@@ -279,9 +279,32 @@ class MinesweeperGame {
     } else {
       this.gameOverTitle.textContent = '游戏结束！';
       this.gameOverMessage.textContent = `很遗憾，你踩到了地雷！`;
+      this.saveGameTime();
     }
     
     this.finalTimeElement.textContent = this.elapsedTime;
+  }
+  
+  saveGameTime() {
+    const gameType = 'minesweeper';
+    
+    if (typeof GameStorage !== 'undefined') {
+      // 调用updateScore，即使分数为0也会记录最后游玩时间
+      GameStorage.updateScore(gameType, 0);
+    } else {
+      // 直接使用localStorage
+      const lastPlayedKey = `game_${gameType}_lastPlayed`;
+      const gameCountKey = `game_${gameType}_gameCount`;
+      
+      // 更新最后游玩时间
+      localStorage.setItem(lastPlayedKey, Date.now().toString());
+      
+      // 更新游戏次数
+      const gameCount = parseInt(localStorage.getItem(gameCountKey)) || 0;
+      localStorage.setItem(gameCountKey, (gameCount + 1).toString());
+    }
+    
+    this.updateStats();
   }
   
   saveScore() {
