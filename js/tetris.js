@@ -447,6 +447,8 @@ class TetrisGame {
     this.lastUpdateTime = 0;
     this.dropTime = 0;
     this.animationId = null;
+    this.landingTimer = 0;
+    this.canMovePiece = true;
 
     // 当前方块状态
     this.currentPiece = null;
@@ -581,39 +583,58 @@ class TetrisGame {
   autoDrop() {
     // 尝试下落
     if (this.canMove(0, 1, this.currentRotation)) {
+      // 方块可以下落，重置落地计时器
+      this.landingTimer = 0;
+      this.canMovePiece = true;
       this.currentY++;
       this.draw();
     } else {
-      // 固定方块到网格
-      this.lockPiece();
-
-      // 检查并消除满行
-      const clearedLines = this.board.clearLines();
-      if (clearedLines > 0) {
-        this.scoreManager.addLines(clearedLines);
+      // 方块不能下落，开始落地倒计时
+      if (this.landingTimer === 0) {
+        this.landingTimer = Date.now();
       }
 
-      // 生成新方块
-      this.currentPiece = this.nextPiece;
-      this.currentRotation = 0;
+      const landingTime = 300; // 0.3秒
+      const elapsed = Date.now() - this.landingTimer;
 
-      // 计算新方块位置
-      this.spawnPiece();
+      // 只有在落地前0.3秒内可以移动
+      this.canMovePiece = elapsed >= (this.scoreManager.getSpeed() - landingTime);
 
-      // 检查游戏结束
-      if (!this.canMove(0, 0, this.currentRotation)) {
-        this.gameOver();
-        return;
+      // 倒计时结束，固定方块
+      if (elapsed >= this.scoreManager.getSpeed()) {
+        // 固定方块到网格
+        this.lockPiece();
+
+        // 检查并消除满行
+        const clearedLines = this.board.clearLines();
+        if (clearedLines > 0) {
+          this.scoreManager.addLines(clearedLines);
+        }
+
+        // 生成新方块
+        this.currentPiece = this.nextPiece;
+        this.currentRotation = 0;
+
+        // 计算新方块位置
+        this.spawnPiece();
+
+        // 检查游戏结束
+        if (!this.canMove(0, 0, this.currentRotation)) {
+          this.gameOver();
+          return;
+        }
+
+        // 生成下一个方块
+        this.nextPiece = Tetromino.createRandom();
+
+        // 重置状态
+        this.landingTimer = 0;
+        this.canMovePiece = true;
+        this.dropTime = Date.now();
+
+        this.draw();
+        this.updateDisplay();
       }
-
-      // 生成下一个方块
-      this.nextPiece = Tetromino.createRandom();
-
-      // 重置下落时间，确保新方块开始正常下落
-      this.dropTime = Date.now();
-
-      this.draw();
-      this.updateDisplay();
     }
   }
 
@@ -628,8 +649,8 @@ class TetrisGame {
   moveLeft() {
     if (!this.isRunning || this.isPaused) return;
 
-    // 检查方块是否已落地
-    if (!this.canMove(0, 1, this.currentRotation)) return;
+    // 检查是否可以移动
+    if (!this.canMovePiece) return;
 
     if (this.canMove(-1, 0, this.currentRotation)) {
       this.currentX--;
@@ -640,8 +661,8 @@ class TetrisGame {
   moveRight() {
     if (!this.isRunning || this.isPaused) return;
 
-    // 检查方块是否已落地
-    if (!this.canMove(0, 1, this.currentRotation)) return;
+    // 检查是否可以移动
+    if (!this.canMovePiece) return;
 
     if (this.canMove(1, 0, this.currentRotation)) {
       this.currentX++;
@@ -652,8 +673,8 @@ class TetrisGame {
   rotate() {
     if (!this.isRunning || this.isPaused) return;
 
-    // 检查方块是否已落地
-    if (!this.canMove(0, 1, this.currentRotation)) return;
+    // 检查是否可以移动
+    if (!this.canMovePiece) return;
 
     const newRotation = (this.currentRotation + 1) % 4;
 
@@ -677,6 +698,9 @@ class TetrisGame {
   softDrop() {
     if (!this.isRunning || this.isPaused) return;
 
+    // 检查是否可以移动
+    if (!this.canMovePiece) return;
+
     if (this.canMove(0, 1, this.currentRotation)) {
       this.currentY++;
       this.draw();
@@ -685,6 +709,9 @@ class TetrisGame {
 
   hardDrop() {
     if (!this.isRunning || this.isPaused) return;
+
+    // 检查是否可以移动
+    if (!this.canMovePiece) return;
 
     while (this.canMove(0, 1, this.currentRotation)) {
       this.currentY++;

@@ -37,6 +37,11 @@ class MinesweeperGame {
   
   setDifficulty(difficulty) {
     switch(difficulty) {
+      case 'beginner':
+        this.rows = 5;
+        this.cols = 5;
+        this.mineCount = 3;
+        break;
       case 'easy':
         this.rows = 9;
         this.cols = 9;
@@ -348,6 +353,7 @@ class MinesweeperGame {
     const baseScore = this.mineCount * 10;
     const timeBonus = Math.max(0, 1000 - this.elapsedTime * 10);
     const difficultyMultiplier = {
+      beginner: 0.5,
       easy: 1,
       medium: 2,
       hard: 3
@@ -357,6 +363,7 @@ class MinesweeperGame {
   }
   
   getDifficulty() {
+    if (this.rows === 5 && this.cols === 5) return 'beginner';
     if (this.rows === 9 && this.cols === 9) return 'easy';
     if (this.rows === 16 && this.cols === 16) return 'medium';
     return 'hard';
