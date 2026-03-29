@@ -359,9 +359,46 @@
         
         .training-stats {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
             margin-bottom: 15px;
+        }
+        
+        .training-details {
+            margin-bottom: 15px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .training-details h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .detail-value {
+            color: #333;
+            font-weight: bold;
+            font-size: 13px;
         }
         
         .stat-item {
@@ -624,11 +661,39 @@
                 <div class="training-stats" id="training-stats">
                     <div class="stat-item">
                         <div class="stat-value" id="stat-games">0</div>
-                        <div class="stat-label">已分析局数</div>
+                        <div class="stat-label">已完成对局</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value" id="stat-patterns">0</div>
-                        <div class="stat-label">发现模式数</div>
+                        <div class="stat-label">当前对局</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="stat-black-wins">0</div>
+                        <div class="stat-label">黑子胜</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="stat-white-wins">0</div>
+                        <div class="stat-label">白子胜</div>
+                    </div>
+                </div>
+                
+                <div class="training-details">
+                    <h4>训练详情</h4>
+                    <div class="detail-item">
+                        <span class="detail-label">总对局数:</span>
+                        <span class="detail-value" id="detail-total-games">50</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">平均步数:</span>
+                        <span class="detail-value" id="detail-avg-moves">0</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">平均时长:</span>
+                        <span class="detail-value" id="detail-avg-duration">0s</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">总耗时:</span>
+                        <span class="detail-value" id="detail-total-duration">0s</span>
                     </div>
                 </div>
                 
