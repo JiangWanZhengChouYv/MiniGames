@@ -176,56 +176,106 @@ class GomokuGame {
         return dialogues[Math.floor(Math.random() * dialogues.length)];
     }
     
-    // ==================== 存储空间监控方法 ====================
+    // ==================== IndexedDB存储方法 ====================
     
-    // 获取当前已使用的localStorage空间（字节数）
-    getStorageUsage() {
-        let totalSize = 0;
-        try {
-            for (let key in localStorage) {
-                if (localStorage.hasOwnProperty(key)) {
-                    const value = localStorage.getItem(key);
-                    if (value) {
-                        // 更精确的计算：key和value都使用UTF-16编码，每个字符2字节
-                        totalSize += key.length * 2;
-                        totalSize += value.length * 2;
-                    }
+    // 数据库名称和版本
+    dbName = 'GomokuDB';
+    dbVersion = 1;
+    db = null;
+    
+    // 初始化IndexedDB
+    async initIndexedDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, this.dbVersion);
+            
+            request.onerror = () => {
+                console.error('IndexedDB打开失败:', request.error);
+                reject(request.error);
+            };
+            
+            request.onsuccess = () => {
+                this.db = request.result;
+                resolve(this.db);
+            };
+            
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                
+                // 创建游戏记录表
+                if (!db.objectStoreNames.contains('gameRecords')) {
+                    const gameStore = db.createObjectStore('gameRecords', { keyPath: 'gameId' });
+                    gameStore.createIndex('startTime', 'startTime');
                 }
-            }
-        } catch (e) {
-            console.warn('计算存储空间失败:', e);
-        }
-        return totalSize;
+                
+                // 创建训练数据表
+                if (!db.objectStoreNames.contains('trainingData')) {
+                    db.createObjectStore('trainingData', { keyPath: 'id' });
+                }
+            };
+        });
     }
     
-    // 返回5MB的限制（浏览器localStorage通常限制为5-10MB）
+    // 获取数据库连接
+    async getDB() {
+        if (!this.db) {
+            await this.initIndexedDB();
+        }
+        return this.db;
+    }
+    
+    // 获取当前已使用的存储空间（字节数）
+    async getStorageUsage() {
+        try {
+            const db = await this.getDB();
+            const transaction = db.transaction(['gameRecords', 'trainingData'], 'readonly');
+            const gameStore = transaction.objectStore('gameRecords');
+            const trainingStore = transaction.objectStore('trainingData');
+            
+            let totalSize = 0;
+            
+            // 计算游戏记录大小
+            const gameRequest = gameStore.getAll();
+            await new Promise((resolve) => {
+                gameRequest.onsuccess = () => {
+                    const records = gameRequest.result;
+                    records.forEach(record => {
+                        totalSize += JSON.stringify(record).length * 2;
+                    });
+                    resolve();
+                };
+                gameRequest.onerror = resolve;
+            });
+            
+            // 计算训练数据大小
+            const trainingRequest = trainingStore.getAll();
+            await new Promise((resolve) => {
+                trainingRequest.onsuccess = () => {
+                    const data = trainingRequest.result;
+                    data.forEach(item => {
+                        totalSize += JSON.stringify(item).length * 2;
+                    });
+                    resolve();
+                };
+                trainingRequest.onerror = resolve;
+            });
+            
+            return totalSize;
+        } catch (e) {
+            console.warn('计算存储空间失败:', e);
+            return 0;
+        }
+    }
+    
+    // 返回100MB的限制
     getStorageLimit() {
-        // 浏览器localStorage通常限制为5MB，保守起见使用4.5MB作为警告阈值
-        return 4718592; // 4.5MB = 4.5 * 1024 * 1024
+        return 104857600; // 100MB = 100 * 1024 * 1024
     }
     
     // 计算已使用空间的百分比
-    getStoragePercentage() {
-        const usage = this.getStorageUsage();
+    async getStoragePercentage() {
+        const usage = await this.getStorageUsage();
         const limit = this.getStorageLimit();
         return Math.min(100, (usage / limit) * 100);
-    }
-    
-    // 获取实际的localStorage配额信息（如果浏览器支持）
-    async getStorageQuota() {
-        if ('storage' in navigator && 'estimate' in navigator.storage) {
-            try {
-                const estimate = await navigator.storage.estimate();
-                return {
-                    usage: estimate.usage || 0,
-                    quota: estimate.quota || this.getStorageLimit(),
-                    percentage: estimate.quota ? (estimate.usage / estimate.quota) * 100 : 0
-                };
-            } catch (e) {
-                console.warn('获取存储配额失败:', e);
-            }
-        }
-        return null;
     }
     
     // 将字节数格式化为人类可读的字符串
@@ -238,108 +288,22 @@ class GomokuGame {
         return size + units[i];
     }
     
-    // ==================== 数据压缩存储方法 ====================
-    
-    // 压缩单条对弈记录
-    compressGameRecord(record) {
-        const compressed = {
-            i: record.gameId,
-            s: record.startTime,
-            e: record.endTime,
-            w: record.winner,
-            t: record.totalMoves,
-            m: record.moves.map(move => ({
-                p: move.player,
-                r: move.row,
-                c: move.col,
-                n: move.moveNumber,
-                ts: move.timestamp
-            }))
-        };
-        return compressed;
-    }
-    
-    // 解压缩对弈记录
-    decompressGameRecord(compressed) {
-        return {
-            gameId: compressed.i,
-            startTime: compressed.s,
-            endTime: compressed.e,
-            winner: compressed.w,
-            totalMoves: compressed.t,
-            moves: compressed.m.map(m => ({
-                player: m.p,
-                row: m.r,
-                col: m.c,
-                moveNumber: m.n,
-                timestamp: m.ts
-            }))
-        };
-    }
-    
-    // 压缩训练数据
-    compressTrainingData(data) {
-        const compressed = {
-            tr: data.isTrained,
-            lt: data.lastTrainingTime,
-            tg: data.totalGamesAnalyzed,
-            pw: {
-                f: data.patternWeights.five,
-                of: data.patternWeights.openFour,
-                cf: data.patternWeights.closedFour,
-                ot: data.patternWeights.openThree,
-                ct: data.patternWeights.closedThree,
-                otw: data.patternWeights.openTwo,
-                ctw: data.patternWeights.closedTwo,
-                upp: data.patternWeights.userPreferredPositions,
-                ua: data.patternWeights.userAggressiveness,
-                ud: data.patternWeights.userDefensiveness,
-                ucp: data.patternWeights.userCenterPreference
-            },
-            ob: data.openingBook
-        };
-        return compressed;
-    }
-    
-    // 解压缩训练数据
-    decompressTrainingData(compressed) {
-        return {
-            isTrained: compressed.tr,
-            lastTrainingTime: compressed.lt,
-            totalGamesAnalyzed: compressed.tg,
-            patternWeights: {
-                five: compressed.pw.f,
-                openFour: compressed.pw.of,
-                closedFour: compressed.pw.cf,
-                openThree: compressed.pw.ot,
-                closedThree: compressed.pw.ct,
-                openTwo: compressed.pw.otw,
-                closedTwo: compressed.pw.ctw,
-                userPreferredPositions: compressed.pw.upp,
-                userAggressiveness: compressed.pw.ua,
-                userDefensiveness: compressed.pw.ud,
-                userCenterPreference: compressed.pw.ucp
-            },
-            openingBook: compressed.ob
-        };
-    }
-    
     // ==================== 自动清理机制 ====================
     
     // 检查存储空间，如果超过80%则自动清理（降低阈值，提前清理）
-    checkStorageAndCleanup() {
-        const percentage = this.getStoragePercentage();
+    async checkStorageAndCleanup() {
+        const percentage = await this.getStoragePercentage();
         if (percentage >= 80) {
             console.warn(`存储空间使用率达到 ${percentage.toFixed(2)}%，开始自动清理...`);
-            this.cleanupOldRecords();
+            await this.cleanupOldRecords();
             return true;
         }
         return false;
     }
     
     // 清理最旧的对弈记录，保留最近30局（减少保留数量，节省空间）
-    cleanupOldRecords() {
-        const records = this.getAllGameRecords();
+    async cleanupOldRecords() {
+        const records = await this.getAllGameRecords();
         const keepCount = 30;
         
         if (records.length <= keepCount) {
@@ -351,8 +315,26 @@ class GomokuGame {
         const recordsToKeep = records.slice(0, keepCount);
         
         try {
-            const compressedRecords = recordsToKeep.map(r => this.compressGameRecord(r));
-            localStorage.setItem(this.storageKey, JSON.stringify(compressedRecords));
+            const db = await this.getDB();
+            const transaction = db.transaction('gameRecords', 'readwrite');
+            const store = transaction.objectStore('gameRecords');
+            
+            // 先清空所有记录
+            await new Promise((resolve, reject) => {
+                const request = store.clear();
+                request.onsuccess = resolve;
+                request.onerror = reject;
+            });
+            
+            // 再添加要保留的记录
+            for (const record of recordsToKeep) {
+                await new Promise((resolve, reject) => {
+                    const request = store.add(record);
+                    request.onsuccess = resolve;
+                    request.onerror = reject;
+                });
+            }
+            
             console.log(`已清理旧记录，保留 ${keepCount} 条最新记录`);
             return true;
         } catch (error) {
@@ -362,15 +344,16 @@ class GomokuGame {
     }
     
     // 获取当前存储的记录数量
-    getRecordsCount() {
-        return this.getAllGameRecords().length;
+    async getRecordsCount() {
+        const records = await this.getAllGameRecords();
+        return records.length;
     }
     
     // ==================== 手动清理功能 ====================
     
     // 手动清理，保留指定数量的最近记录
-    manualCleanup(keepCount = 30) {
-        const records = this.getAllGameRecords();
+    async manualCleanup(keepCount = 30) {
+        const records = await this.getAllGameRecords();
         
         if (records.length <= keepCount) {
             console.log(`当前记录数 ${records.length}，无需清理（保留数量：${keepCount}）`);
@@ -383,8 +366,26 @@ class GomokuGame {
         const removedCount = records.length - keepCount;
         
         try {
-            const compressedRecords = recordsToKeep.map(r => this.compressGameRecord(r));
-            localStorage.setItem(this.storageKey, JSON.stringify(compressedRecords));
+            const db = await this.getDB();
+            const transaction = db.transaction('gameRecords', 'readwrite');
+            const store = transaction.objectStore('gameRecords');
+            
+            // 先清空所有记录
+            await new Promise((resolve, reject) => {
+                const request = store.clear();
+                request.onsuccess = resolve;
+                request.onerror = reject;
+            });
+            
+            // 再添加要保留的记录
+            for (const record of recordsToKeep) {
+                await new Promise((resolve, reject) => {
+                    const request = store.add(record);
+                    request.onsuccess = resolve;
+                    request.onerror = reject;
+                });
+            }
+            
             console.log(`手动清理完成，删除 ${removedCount} 条记录，保留 ${keepCount} 条`);
             return { success: true, removed: removedCount, remaining: keepCount };
         } catch (error) {
@@ -394,17 +395,31 @@ class GomokuGame {
     }
     
     // 清空所有对弈数据和训练数据（保留最高分记录）
-    clearAllData() {
+    async clearAllData() {
         try {
             // 保存最高分记录
             const maxScoreKey = 'game_gomoku_maxScore';
             const maxScore = localStorage.getItem(maxScoreKey);
             
-            // 删除对弈记录
-            localStorage.removeItem(this.storageKey);
+            const db = await this.getDB();
             
-            // 删除训练数据
-            localStorage.removeItem(this.aiTraining.trainingDataKey);
+            // 清空对弈记录
+            const gameTransaction = db.transaction('gameRecords', 'readwrite');
+            const gameStore = gameTransaction.objectStore('gameRecords');
+            await new Promise((resolve, reject) => {
+                const request = gameStore.clear();
+                request.onsuccess = resolve;
+                request.onerror = reject;
+            });
+            
+            // 清空训练数据
+            const trainingTransaction = db.transaction('trainingData', 'readwrite');
+            const trainingStore = trainingTransaction.objectStore('trainingData');
+            await new Promise((resolve, reject) => {
+                const request = trainingStore.clear();
+                request.onsuccess = resolve;
+                request.onerror = reject;
+            });
             
             // 恢复最高分记录
             if (maxScore !== null) {
@@ -472,57 +487,65 @@ class GomokuGame {
     }
     
     // 结束记录
-    endRecording(winner) {
+    async endRecording(winner) {
         if (!this.currentGameRecord) return;
         
         this.currentGameRecord.endTime = new Date().toISOString();
         this.currentGameRecord.winner = winner;
         this.currentGameRecord.totalMoves = this.moveNumber;
         
-        this.saveGameRecord(this.currentGameRecord);
+        await this.saveGameRecord(this.currentGameRecord);
         
         // 游戏结束后触发AI训练
-        this.trainAI();
+        await this.trainAI();
         
         // 重置当前记录
         this.currentGameRecord = null;
         this.moveNumber = 0;
     }
     
-    // 保存对弈记录到localStorage（带空间检查和自动清理）
-    saveGameRecord(record) {
+    // 保存对弈记录到IndexedDB（带空间检查和自动清理）
+    async saveGameRecord(record) {
         try {
             // 在保存前检查空间，如果超过90%则自动清理
-            const wasCleaned = this.checkStorageAndCleanup();
+            const wasCleaned = await this.checkStorageAndCleanup();
             if (wasCleaned) {
                 console.log('存储空间不足，已自动清理旧记录');
             }
             
-            const existingRecords = this.getAllGameRecords();
-            existingRecords.push(record);
+            const db = await this.getDB();
+            const transaction = db.transaction('gameRecords', 'readwrite');
+            const store = transaction.objectStore('gameRecords');
             
-            // 压缩记录后存储
-            const compressedRecords = existingRecords.map(r => this.compressGameRecord(r));
-            localStorage.setItem(this.storageKey, JSON.stringify(compressedRecords));
+            // 直接存储记录，不需要压缩
+            await new Promise((resolve, reject) => {
+                const request = store.add(record);
+                request.onsuccess = resolve;
+                request.onerror = reject;
+            });
             
             // 显示存储状态
-            const usage = this.getStorageUsage();
-            const percentage = this.getStoragePercentage();
+            const usage = await this.getStorageUsage();
+            const percentage = await this.getStoragePercentage();
             console.log(`对弈记录已保存。存储使用: ${this.formatStorageSize(usage)} (${percentage.toFixed(2)}%)`);
             
             // 更新存储空间UI
-            this.updateStorageUI();
+            await this.updateStorageUI();
         } catch (error) {
             console.error('保存对弈记录失败:', error);
             // 如果是存储空间不足错误，尝试清理后重试
             if (error.name === 'QuotaExceededError' || error.message.includes('quota')) {
                 console.warn('存储空间不足，尝试清理后重试...');
-                this.cleanupOldRecords();
+                await this.cleanupOldRecords();
                 try {
-                    const existingRecords = this.getAllGameRecords();
-                    existingRecords.push(record);
-                    const compressedRecords = existingRecords.map(r => this.compressGameRecord(r));
-                    localStorage.setItem(this.storageKey, JSON.stringify(compressedRecords));
+                    const db = await this.getDB();
+                    const transaction = db.transaction('gameRecords', 'readwrite');
+                    const store = transaction.objectStore('gameRecords');
+                    await new Promise((resolve, reject) => {
+                        const request = store.add(record);
+                        request.onsuccess = resolve;
+                        request.onerror = reject;
+                    });
                     console.log('清理后保存成功');
                 } catch (retryError) {
                     console.error('清理后仍无法保存:', retryError);
@@ -531,22 +554,23 @@ class GomokuGame {
         }
     }
     
-    // 获取所有对弈记录（自动处理压缩/未压缩数据）
-    getAllGameRecords() {
+    // 获取所有对弈记录
+    async getAllGameRecords() {
         try {
-            const records = localStorage.getItem(this.storageKey);
-            if (!records) return [];
+            const db = await this.getDB();
+            const transaction = db.transaction('gameRecords', 'readonly');
+            const store = transaction.objectStore('gameRecords');
             
-            const parsed = JSON.parse(records);
-            
-            // 检查是否是压缩格式（通过检查第一个记录的键名）
-            if (parsed.length > 0 && parsed[0].i !== undefined) {
-                // 压缩格式，需要解压缩
-                return parsed.map(r => this.decompressGameRecord(r));
-            }
-            
-            // 未压缩格式，直接返回
-            return parsed;
+            return await new Promise((resolve) => {
+                const request = store.getAll();
+                request.onsuccess = () => {
+                    resolve(request.result);
+                };
+                request.onerror = () => {
+                    console.error('获取对弈记录失败:', request.error);
+                    resolve([]);
+                };
+            });
         } catch (error) {
             console.error('获取对弈记录失败:', error);
             return [];
@@ -554,15 +578,41 @@ class GomokuGame {
     }
     
     // 根据ID获取特定对弈记录
-    getGameRecordById(gameId) {
-        const records = this.getAllGameRecords();
-        return records.find(record => record.gameId === gameId) || null;
+    async getGameRecordById(gameId) {
+        try {
+            const db = await this.getDB();
+            const transaction = db.transaction('gameRecords', 'readonly');
+            const store = transaction.objectStore('gameRecords');
+            
+            return await new Promise((resolve) => {
+                const request = store.get(gameId);
+                request.onsuccess = () => {
+                    resolve(request.result || null);
+                };
+                request.onerror = () => {
+                    console.error('获取对弈记录失败:', request.error);
+                    resolve(null);
+                };
+            });
+        } catch (error) {
+            console.error('获取对弈记录失败:', error);
+            return null;
+        }
     }
     
     // 清空所有对弈记录
-    clearAllGameRecords() {
+    async clearAllGameRecords() {
         try {
-            localStorage.removeItem(this.storageKey);
+            const db = await this.getDB();
+            const transaction = db.transaction('gameRecords', 'readwrite');
+            const store = transaction.objectStore('gameRecords');
+            
+            await new Promise((resolve, reject) => {
+                const request = store.clear();
+                request.onsuccess = resolve;
+                request.onerror = reject;
+            });
+            
             return true;
         } catch (error) {
             console.error('清空对弈记录失败:', error);
@@ -575,13 +625,13 @@ class GomokuGame {
     // ==================== AI训练系统方法 ====================
     
     // 主训练方法
-    trainAI() {
+    async trainAI() {
         try {
             // 使用 requestIdleCallback 或 setTimeout 确保不阻塞主线程
             if (typeof requestIdleCallback !== 'undefined') {
-                requestIdleCallback(() => this._performTraining(), { timeout: 2000 });
+                requestIdleCallback(async () => await this._performTraining(), { timeout: 2000 });
             } else {
-                setTimeout(() => this._performTraining(), 100);
+                setTimeout(async () => await this._performTraining(), 100);
             }
         } catch (error) {
             console.error('AI训练启动失败:', error);
@@ -589,11 +639,11 @@ class GomokuGame {
     }
     
     // 执行训练（内部方法）
-    _performTraining() {
+    async _performTraining() {
         const startTime = Date.now();
         
         // 获取所有对弈记录
-        const records = this.getAllGameRecords();
+        const records = await this.getAllGameRecords();
         
         if (records.length === 0) {
             console.log('没有对弈记录，跳过训练');
@@ -612,7 +662,7 @@ class GomokuGame {
         this.aiTraining.totalGamesAnalyzed = records.length;
         
         // 保存训练数据
-        this.saveTrainingData();
+        await this.saveTrainingData();
         
         const endTime = Date.now();
         console.log(`AI训练完成，耗时 ${endTime - startTime}ms，分析了 ${records.length} 场对局`);
@@ -802,63 +852,72 @@ class GomokuGame {
         this.aiTraining.openingBook = openingBook;
     }
     
-    // 保存训练数据到localStorage（带压缩）
-    saveTrainingData() {
+    // 保存训练数据到IndexedDB
+    async saveTrainingData() {
         try {
             const dataToSave = {
+                id: 'trainingData',
                 isTrained: this.aiTraining.isTrained,
                 patternWeights: this.aiTraining.patternWeights,
                 openingBook: this.aiTraining.openingBook,
                 lastTrainingTime: this.aiTraining.lastTrainingTime,
                 totalGamesAnalyzed: this.aiTraining.totalGamesAnalyzed
             };
-            // 压缩后存储
-            const compressedData = this.compressTrainingData(dataToSave);
-            localStorage.setItem(this.aiTraining.trainingDataKey, JSON.stringify(compressedData));
+            
+            const db = await this.getDB();
+            const transaction = db.transaction('trainingData', 'readwrite');
+            const store = transaction.objectStore('trainingData');
+            
+            // 使用put方法，存在则更新，不存在则添加
+            await new Promise((resolve, reject) => {
+                const request = store.put(dataToSave);
+                request.onsuccess = resolve;
+                request.onerror = reject;
+            });
         } catch (error) {
             console.error('保存AI训练数据失败:', error);
         }
     }
     
-    // 从localStorage加载训练数据（自动处理压缩/未压缩数据）
-    loadTrainingData() {
+    // 从IndexedDB加载训练数据
+    async loadTrainingData() {
         try {
-            const savedData = localStorage.getItem(this.aiTraining.trainingDataKey);
+            const db = await this.getDB();
+            const transaction = db.transaction('trainingData', 'readonly');
+            const store = transaction.objectStore('trainingData');
+            
+            const savedData = await new Promise((resolve) => {
+                const request = store.get('trainingData');
+                request.onsuccess = () => {
+                    resolve(request.result);
+                };
+                request.onerror = () => {
+                    console.error('加载AI训练数据失败:', request.error);
+                    resolve(null);
+                };
+            });
+            
             if (savedData) {
-                const parsed = JSON.parse(savedData);
-                
-                // 检查是否是压缩格式（通过检查tr键是否存在）
-                if (parsed.tr !== undefined) {
-                    // 压缩格式，需要解压缩
-                    const decompressed = this.decompressTrainingData(parsed);
-                    this.aiTraining.isTrained = decompressed.isTrained || false;
-                    this.aiTraining.patternWeights = decompressed.patternWeights || this.aiTraining.patternWeights;
-                    this.aiTraining.openingBook = decompressed.openingBook || {};
-                    this.aiTraining.lastTrainingTime = decompressed.lastTrainingTime || null;
-                    this.aiTraining.totalGamesAnalyzed = decompressed.totalGamesAnalyzed || 0;
-                } else {
-                    // 未压缩格式，直接加载
-                    this.aiTraining.isTrained = parsed.isTrained || false;
-                    this.aiTraining.patternWeights = parsed.patternWeights || this.aiTraining.patternWeights;
-                    this.aiTraining.openingBook = parsed.openingBook || {};
-                    this.aiTraining.lastTrainingTime = parsed.lastTrainingTime || null;
-                    this.aiTraining.totalGamesAnalyzed = parsed.totalGamesAnalyzed || 0;
-                }
+                this.aiTraining.isTrained = savedData.isTrained || false;
+                this.aiTraining.patternWeights = savedData.patternWeights || this.aiTraining.patternWeights;
+                this.aiTraining.openingBook = savedData.openingBook || {};
+                this.aiTraining.lastTrainingTime = savedData.lastTrainingTime || null;
+                this.aiTraining.totalGamesAnalyzed = savedData.totalGamesAnalyzed || 0;
                 
                 console.log('AI训练数据已加载，已分析对局数:', this.aiTraining.totalGamesAnalyzed);
             } else {
                 // 如果没有训练数据，加载预设的训练数据
-                this.loadDefaultTrainingData();
+                await this.loadDefaultTrainingData();
             }
         } catch (error) {
             console.error('加载AI训练数据失败:', error);
             // 加载失败时使用预设训练数据
-            this.loadDefaultTrainingData();
+            await this.loadDefaultTrainingData();
         }
     }
     
     // 加载预设的训练数据
-    loadDefaultTrainingData() {
+    async loadDefaultTrainingData() {
         console.log('加载预设训练数据...');
         
         // 预设的对弈记录
@@ -955,23 +1014,43 @@ class GomokuGame {
             }
         ];
         
-        // 保存预设记录到localStorage
+        // 保存预设记录到IndexedDB
         try {
-            const compressedRecords = defaultRecords.map(r => this.compressGameRecord(r));
-            localStorage.setItem(this.storageKey, JSON.stringify(compressedRecords));
+            const db = await this.getDB();
+            const transaction = db.transaction('gameRecords', 'readwrite');
+            const store = transaction.objectStore('gameRecords');
+            
+            // 批量添加预设记录
+            for (const record of defaultRecords) {
+                await new Promise((resolve, reject) => {
+                    const request = store.add(record);
+                    request.onsuccess = resolve;
+                    request.onerror = reject;
+                });
+            }
+            
             console.log('预设对弈记录已保存');
             
             // 对预设数据进行训练
-            this.trainAI();
+            await this.trainAI();
         } catch (error) {
             console.error('保存预设训练数据失败:', error);
         }
     }
     
     // 清除训练数据
-    clearTrainingData() {
+    async clearTrainingData() {
         try {
-            localStorage.removeItem(this.aiTraining.trainingDataKey);
+            const db = await this.getDB();
+            const transaction = db.transaction('trainingData', 'readwrite');
+            const store = transaction.objectStore('trainingData');
+            
+            await new Promise((resolve, reject) => {
+                const request = store.delete('trainingData');
+                request.onsuccess = resolve;
+                request.onerror = reject;
+            });
+            
             this.aiTraining.isTrained = false;
             this.aiTraining.patternWeights = {
                 five: 100000,
@@ -1053,12 +1132,12 @@ class GomokuGame {
     // ==================== 训练状态反馈界面方法 ====================
     
     // 开始训练（手动触发）
-    startTraining() {
+    async startTraining() {
         if (this.trainingState.isTraining) {
             return;
         }
         
-        const records = this.getAllGameRecords();
+        const records = await this.getAllGameRecords();
         if (records.length === 0) {
             alert('暂无对弈记录，请先进行几局游戏后再训练AI！');
             return;
@@ -1081,7 +1160,7 @@ class GomokuGame {
         this.updateTrainingUI();
         
         // 开始训练
-        this.performTrainingWithProgress(records);
+        await this.performTrainingWithProgress(records);
     }
     
     // 显示训练面板
@@ -1356,7 +1435,7 @@ class GomokuGame {
             };
             
             // 保存游戏记录
-            this.saveGameRecord(gameRecord);
+            await this.saveGameRecord(gameRecord);
             
             // 清空棋盘，为下一局做准备
             this.initializeBoard();
@@ -1834,7 +1913,7 @@ class GomokuGame {
         this.aiTraining.totalGamesAnalyzed = records.length;
         
         // 保存训练数据
-        this.saveTrainingData();
+        await this.saveTrainingData();
         
         // 标记训练完成
         this.trainingState.isTraining = false;
@@ -1850,14 +1929,14 @@ class GomokuGame {
         console.log(`AI训练完成，耗时 ${duration}ms，分析了 ${records.length} 场对局`);
         
         // 显示训练结果
-        setTimeout(() => {
+        setTimeout(async () => {
             this.showTrainingResult({
                 duration,
                 analyzedGames: records.length,
                 analysis
             });
             this.hideTrainingPanel();
-            this.updateStorageUI();
+            await this.updateStorageUI();
         }, 500);
     }
     
@@ -1972,15 +2051,15 @@ class GomokuGame {
     }
     
     // 更新存储空间UI
-    updateStorageUI() {
+    async updateStorageUI() {
         const storageFill = document.getElementById('storage-fill');
         const storageText = document.getElementById('storage-text');
         
         if (!storageFill || !storageText) return;
         
-        const usage = this.getStorageUsage();
+        const usage = await this.getStorageUsage();
         const limit = this.getStorageLimit();
-        const percentage = this.getStoragePercentage();
+        const percentage = await this.getStoragePercentage();
         
         storageFill.style.width = percentage + '%';
         storageText.textContent = `${this.formatStorageSize(usage)} / ${this.formatStorageSize(limit)}`;
@@ -1995,8 +2074,8 @@ class GomokuGame {
     }
     
     // 处理清理按钮点击
-    handleCleanup() {
-        const result = this.manualCleanup(30);
+    async handleCleanup() {
+        const result = await this.manualCleanup(30);
         
         if (result.success) {
             if (result.removed > 0) {
@@ -2004,7 +2083,7 @@ class GomokuGame {
             } else {
                 alert(`当前记录数 ${result.remaining}，无需清理。`);
             }
-            this.updateStorageUI();
+            await this.updateStorageUI();
         } else {
             alert('清理失败：' + (result.error || '未知错误'));
         }
