@@ -610,9 +610,9 @@ class GomokuGame {
         }
     }
     
-    // 返回100MB的限制
+    // 返回512MB的限制
     getStorageLimit() {
-        return 104857600; // 100MB = 100 * 1024 * 1024
+        return 536870912; // 512MB = 512 * 1024 * 1024
     }
     
     // 计算已使用空间的百分比
@@ -2647,14 +2647,36 @@ class GomokuGame {
     }
     
     aiMove() {
+        // 检查游戏状态，确保游戏仍在进行中
+        if (this.gameStatus !== 'playing') {
+            return;
+        }
+        
         const move = this.getBestMove();
         if (move) {
-            this.makeMove(move.row, move.col, 'white');
-            
-            // 检查胜负
-            if (this.checkWin(move.row, move.col, 'white')) {
-                this.endGame('white');
-                return;
+            // 检查目标位置是否为空
+            if (this.board[move.row][move.col] !== null) {
+                console.warn('AI尝试在非空位置落子:', move);
+                // 重新获取有效落子
+                const validMoves = this.getEmptyCells();
+                if (validMoves.length > 0) {
+                    const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                    this.makeMove(randomMove.row, randomMove.col, 'white');
+                    
+                    // 检查胜负
+                    if (this.checkWin(randomMove.row, randomMove.col, 'white')) {
+                        this.endGame('white');
+                        return;
+                    }
+                }
+            } else {
+                this.makeMove(move.row, move.col, 'white');
+                
+                // 检查胜负
+                if (this.checkWin(move.row, move.col, 'white')) {
+                    this.endGame('white');
+                    return;
+                }
             }
             
             // 检查平局
@@ -2683,7 +2705,8 @@ class GomokuGame {
             return openingMove;
         }
         
-        const depth = 3;
+        // 增加搜索深度，提高AI智能，增加CPU占用
+        const depth = 5;
         const result = this.minimax(depth, -Infinity, Infinity, true);
         return result.move;
     }
@@ -2736,20 +2759,6 @@ class GomokuGame {
                     return { score: 100000, move: cell };
                 }
                 
-                // 检查玩家是否有四连，需要优先拦截
-                let playerHasFour = false;
-                for (let i = 0; i < this.boardSize; i++) {
-                    for (let j = 0; j < this.boardSize; j++) {
-                        if (this.board[i][j] === 'black') {
-                            if (this.checkPotentialFour(i, j, 'black')) {
-                                playerHasFour = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (playerHasFour) break;
-                }
-                
                 const result = this.minimax(depth - 1, alpha, beta, false);
                 this.board[cell.row][cell.col] = null;
                 
@@ -2777,12 +2786,6 @@ class GomokuGame {
                     return { score: -100000, move: cell };
                 }
                 
-                // 检查玩家是否形成四连
-                if (this.checkPotentialFour(cell.row, cell.col, 'black')) {
-                    this.board[cell.row][cell.col] = null;
-                    return { score: -50000, move: cell };
-                }
-                
                 const result = this.minimax(depth - 1, alpha, beta, true);
                 this.board[cell.row][cell.col] = null;
                 
@@ -2801,56 +2804,107 @@ class GomokuGame {
         }
     }
     
-    // 检查是否形成四连
-    checkPotentialFour(row, col, player) {
-        const directions = [
-            [1, 0],   // 水平
-            [0, 1],   // 垂直
-            [1, 1],   // 对角线
-            [1, -1]   // 反对角线
-        ];
-        
-        for (const [dr, dc] of directions) {
-            let count = 1;
-            let i = row + dr;
-            let j = col + dc;
-            
-            while (i >= 0 && i < this.boardSize && j >= 0 && j < this.boardSize && this.board[i][j] === player) {
-                count++;
-                i += dr;
-                j += dc;
-            }
-            
-            i = row - dr;
-            j = col - dc;
-            while (i >= 0 && i < this.boardSize && j >= 0 && j < this.boardSize && this.board[i][j] === player) {
-                count++;
-                i -= dr;
-                j -= dc;
-            }
-            
-            if (count >= 4) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
+
     
     evaluateBoard() {
         let score = 0;
         
-        // 评估AI的优势
-        score += this.evaluatePlayer('white');
-        // 评估玩家的优势
-        score -= this.evaluatePlayer('black');
+        // 评估AI的优势（增强版）
+        score += this.evaluatePlayer('white') * 1.2;
+        // 评估玩家的优势（增强版）
+        score -= this.evaluatePlayer('black') * 1.2;
+        
+        // 增强的中心位置评估
+        score += this.evaluateCenterControl('white') - this.evaluateCenterControl('black');
+        
+        // 增强的连接性评估
+        score += this.evaluateConnectivity('white') - this.evaluateConnectivity('black');
+        
+        // 增强的潜在机会评估
+        score += this.evaluatePotentialMoves('white') - this.evaluatePotentialMoves('black');
         
         // 如果已训练，应用用户偏好位置的防守权重
         if (this.aiTraining.isTrained) {
-            score += this.applyUserPreferenceDefense();
+            score += this.applyUserPreferenceDefense() * 1.5;
         }
         
         return score;
+    }
+    
+    // 评估中心控制
+    evaluateCenterControl(player) {
+        let centerScore = 0;
+        const centerRow = Math.floor(this.boardSize / 2);
+        const centerCol = Math.floor(this.boardSize / 2);
+        
+        for (let i = 0; i < this.boardSize; i++) {
+            for (let j = 0; j < this.boardSize; j++) {
+                if (this.board[i][j] === player) {
+                    const distance = Math.sqrt(Math.pow(i - centerRow, 2) + Math.pow(j - centerCol, 2));
+                    const bonus = Math.max(0, 30 - distance * 3);
+                    centerScore += bonus;
+                }
+            }
+        }
+        
+        return centerScore;
+    }
+    
+    // 评估棋子的连接性
+    evaluateConnectivity(player) {
+        let connectivityScore = 0;
+        const directions = [[1,0],[0,1],[1,1],[1,-1]];
+        
+        for (let i = 0; i < this.boardSize; i++) {
+            for (let j = 0; j < this.boardSize; j++) {
+                if (this.board[i][j] === player) {
+                    for (const [dr, dc] of directions) {
+                        let count = 1;
+                        let x = i + dr;
+                        let y = j + dc;
+                        
+                        while (x >= 0 && x < this.boardSize && y >= 0 && y < this.boardSize && this.board[x][y] === player) {
+                            count++;
+                            x += dr;
+                            y += dc;
+                        }
+                        
+                        x = i - dr;
+                        y = j - dc;
+                        while (x >= 0 && x < this.boardSize && y >= 0 && y < this.boardSize && this.board[x][y] === player) {
+                            count++;
+                            x -= dr;
+                            y -= dc;
+                        }
+                        
+                        if (count > 1) {
+                            connectivityScore += count * count * 2;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return connectivityScore;
+    }
+    
+    // 评估潜在的进攻机会
+    evaluatePotentialMoves(player) {
+        let potentialScore = 0;
+        
+        for (let i = 0; i < this.boardSize; i++) {
+            for (let j = 0; j < this.boardSize; j++) {
+                if (this.board[i][j] === null) {
+                    // 临时放置棋子进行评估
+                    this.board[i][j] = player;
+                    const tempScore = this.evaluatePosition(i, j, player);
+                    this.board[i][j] = null;
+                    potentialScore += tempScore * 0.2;
+                }
+            }
+        }
+        
+        return potentialScore;
     }
     
     // 应用用户偏好位置的防守权重
