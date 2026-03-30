@@ -1402,6 +1402,12 @@ class GomokuGame {
             return null;
         }
         
+        // 如果是游戏的第一步（棋盘为空），随机落子
+        if (emptyPositions.length === this.boardSize * this.boardSize) {
+            const randomIndex = Math.floor(Math.random() * emptyPositions.length);
+            return emptyPositions[randomIndex];
+        }
+        
         // 对每个位置进行评分
         const scoredPositions = emptyPositions.map(pos => {
             const score = this.evaluatePosition(board, pos.row, pos.col, player);
