@@ -1394,11 +1394,11 @@ class GomokuGame {
                     // 切换玩家
                     currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
                     
-                    // 添加延迟，使用户可以观察到落子过程
-                    await new Promise(resolve => setTimeout(resolve, 50)); // 50ms延迟，使可视化效果更明显
+                    // 添加延迟，使用户可以观察到落子过程，但减少延迟时间
+                    await new Promise(resolve => setTimeout(resolve, 10)); // 10ms延迟，保持可视化效果的同时提高速度
                     
                     // 添加随机延迟，模拟AI思考时间，使时间数据更加真实
-                    const randomDelay = Math.floor(Math.random() * 10) + 1; // 1-10ms的随机延迟
+                    const randomDelay = Math.floor(Math.random() * 5) + 1; // 1-5ms的随机延迟，减少整体延迟
                     await new Promise(resolve => setTimeout(resolve, randomDelay));
                 } catch (stepError) {
                     console.error('自我对弈步骤错误:', stepError);
@@ -1467,12 +1467,38 @@ class GomokuGame {
     getAIMove(board, player) {
         // 简单的AI落子逻辑，基于评分
         const emptyPositions = [];
+        const hasAdjacentPieces = new Set();
         
-        // 收集所有空位置
+        // 首先收集所有有相邻棋子的位置
         for (let i = 0; i < this.boardSize; i++) {
             for (let j = 0; j < this.boardSize; j++) {
-                if (!board[i][j]) {
-                    emptyPositions.push({ row: i, col: j });
+                if (board[i][j]) {
+                    // 检查周围8个方向
+                    const directions = [[-1,-1], [-1,0], [-1,1], [0,-1], [0,1], [1,-1], [1,0], [1,1]];
+                    for (const [di, dj] of directions) {
+                        const ni = i + di;
+                        const nj = j + dj;
+                        if (ni >= 0 && ni < this.boardSize && nj >= 0 && nj < this.boardSize && !board[ni][nj]) {
+                            hasAdjacentPieces.add(`${ni},${nj}`);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 如果有相邻棋子的位置，只考虑这些位置
+        if (hasAdjacentPieces.size > 0) {
+            for (const posStr of hasAdjacentPieces) {
+                const [row, col] = posStr.split(',').map(Number);
+                emptyPositions.push({ row, col });
+            }
+        } else {
+            // 否则考虑所有空位置
+            for (let i = 0; i < this.boardSize; i++) {
+                for (let j = 0; j < this.boardSize; j++) {
+                    if (!board[i][j]) {
+                        emptyPositions.push({ row: i, col: j });
+                    }
                 }
             }
         }
@@ -2155,10 +2181,10 @@ class GomokuGame {
         // 显示AI思考中的对话
         this.showDialog("让我想想...", true);
         
-        // AI落子
+        // AI落子，减少延迟时间，提高响应速度
         setTimeout(() => {
             this.aiMove();
-        }, 500);
+        }, 200); // 减少到200ms，保持思考感的同时提高响应速度
     }
     
     makeMove(row, col, player) {
