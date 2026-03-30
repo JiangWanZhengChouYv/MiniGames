@@ -1184,8 +1184,11 @@ class GomokuGame {
                 this.autoLearnState.progress = (i / totalGames) * 100;
                 this.updateAutoLearnUI();
                 
+                // 轮换先手，确保公平性
+                const firstPlayer = i % 2 === 0 ? 'black' : 'white';
+                
                 // 模拟自我对弈
-                const gameResult = await this.simulateSelfGame();
+                const gameResult = await this.simulateSelfGame(firstPlayer);
                 
                 // 检查是否被取消
                 if (gameResult.cancelled) {
@@ -1196,6 +1199,9 @@ class GomokuGame {
                 // 记录性能数据
                 this.autoLearnState.performanceData.push(gameResult);
                 this.autoLearnState.completedGames++;
+                
+                // 立即更新UI，确保数据实时显示
+                this.updateAutoLearnUI();
                 
                 // 让出时间片，避免阻塞UI
                 await new Promise(resolve => requestAnimationFrame(resolve));
@@ -1247,12 +1253,12 @@ class GomokuGame {
     }
     
     // 模拟自我对弈
-    async simulateSelfGame() {
+    async simulateSelfGame(firstPlayer = 'black') {
         try {
             // 创建一个临时棋盘
             const tempBoard = Array(this.boardSize).fill(null).map(() => Array(this.boardSize).fill(null));
             const moves = [];
-            let currentPlayer = 'black';
+            let currentPlayer = firstPlayer;
             let gameStatus = 'playing';
             let winner = null;
             let moveCount = 0;
@@ -1270,38 +1276,53 @@ class GomokuGame {
                     break;
                 }
                 
-                // 生成AI落子
-                const move = this.getAIMove(tempBoard, currentPlayer);
-                
-                if (!move) {
-                    break; // 没有可用位置
+                try {
+                    // 生成AI落子
+                    const move = this.getAIMove(tempBoard, currentPlayer);
+                    
+                    if (!move) {
+                        break; // 没有可用位置
+                    }
+                    
+                    // 落子到临时棋盘
+                    tempBoard[move.row][move.col] = currentPlayer;
+                    
+                    // 同时更新实际棋盘用于可视化
+                    this.board[move.row][move.col] = currentPlayer;
+                    this.renderBoard();
+                    
+                    moves.push({ 
+                        player: currentPlayer, 
+                        row: move.row, 
+                        col: move.col, 
+                        timestamp: new Date().toISOString(),
+                        moveNumber: moveCount + 1
+                    });
+                    
+                    moveCount++;
+                    
+                    // 检查胜负
+                    if (this.checkWin(move.row, move.col, currentPlayer, tempBoard)) {
+                        winner = currentPlayer;
+                        gameStatus = 'ended';
+                    } else if (moveCount === 225) {
+                        gameStatus = 'ended'; // 平局
+                    }
+                    
+                    // 切换玩家
+                    currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+                    
+                    // 添加延迟，使用户可以观察到落子过程
+                    await new Promise(resolve => setTimeout(resolve, 50)); // 50ms延迟，使可视化效果更明显
+                    
+                    // 添加随机延迟，模拟AI思考时间，使时间数据更加真实
+                    const randomDelay = Math.floor(Math.random() * 10) + 1; // 1-10ms的随机延迟
+                    await new Promise(resolve => setTimeout(resolve, randomDelay));
+                } catch (stepError) {
+                    console.error('自我对弈步骤错误:', stepError);
+                    // 继续下一局，不影响整体训练
+                    break;
                 }
-                
-                // 落子
-                tempBoard[move.row][move.col] = currentPlayer;
-                moves.push({ 
-                    player: currentPlayer, 
-                    row: move.row, 
-                    col: move.col, 
-                    timestamp: new Date().toISOString(),
-                    moveNumber: moveCount + 1
-                });
-                
-                moveCount++;
-                
-                // 检查胜负
-                if (this.checkWin(move.row, move.col, currentPlayer, tempBoard)) {
-                    winner = currentPlayer;
-                    gameStatus = 'ended';
-                } else if (moveCount === 225) {
-                    gameStatus = 'ended'; // 平局
-                }
-                
-                // 切换玩家
-                currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
-                
-                // 短暂延迟，避免阻塞
-                await new Promise(resolve => setTimeout(resolve, 1));
             }
             
             const endTime = Date.now();
@@ -1309,6 +1330,9 @@ class GomokuGame {
             // 检查是否被取消
             if (this.autoLearnState.cancelRequested) {
                 console.log('取消后不保存游戏记录');
+                // 清空棋盘
+                this.initializeBoard();
+                this.renderBoard();
                 return {
                     gameId: null,
                     winner: null,
@@ -1331,6 +1355,10 @@ class GomokuGame {
             // 保存游戏记录
             this.saveGameRecord(gameRecord);
             
+            // 清空棋盘，为下一局做准备
+            this.initializeBoard();
+            this.renderBoard();
+            
             return {
                 gameId: gameRecord.gameId,
                 winner: winner,
@@ -1339,6 +1367,9 @@ class GomokuGame {
             };
         } catch (error) {
             console.error('自我对弈过程中发生错误:', error);
+            // 清空棋盘
+            this.initializeBoard();
+            this.renderBoard();
             return {
                 gameId: null,
                 winner: null,
