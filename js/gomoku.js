@@ -18,7 +18,7 @@ class GomokuGame {
                 // 基础棋型权重
                 five: 100000,           // 五连
                 openFour: 10000,        // 活四
-                closedFour: 1000,       // 冲四
+                closedFour: 5000,       // 冲四（提高权重，确保优先拦截）
                 openThree: 1000,        // 活三
                 closedThree: 100,       // 眠三
                 openTwo: 100,           // 活二
@@ -26,7 +26,7 @@ class GomokuGame {
                 // 用户偏好调整
                 userPreferredPositions: {},  // 用户偏好位置
                 userAggressiveness: 0.5,     // 用户进攻倾向 (0-1)
-                userDefensiveness: 0.5,      // 用户防守倾向 (0-1)
+                userDefensiveness: 0.8,      // 用户防守倾向 (0-1) - 提高防守倾向
                 userCenterPreference: 0.5,   // 用户中心偏好 (0-1)
             },
             openingBook: {},             // 开局库
@@ -2733,7 +2733,21 @@ class GomokuGame {
                 
                 if (this.checkWin(cell.row, cell.col, 'white')) {
                     this.board[cell.row][cell.col] = null;
-                    return { score: 1000, move: cell };
+                    return { score: 100000, move: cell };
+                }
+                
+                // 检查玩家是否有四连，需要优先拦截
+                let playerHasFour = false;
+                for (let i = 0; i < this.boardSize; i++) {
+                    for (let j = 0; j < this.boardSize; j++) {
+                        if (this.board[i][j] === 'black') {
+                            if (this.checkPotentialFour(i, j, 'black')) {
+                                playerHasFour = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (playerHasFour) break;
                 }
                 
                 const result = this.minimax(depth - 1, alpha, beta, false);
@@ -2760,7 +2774,13 @@ class GomokuGame {
                 
                 if (this.checkWin(cell.row, cell.col, 'black')) {
                     this.board[cell.row][cell.col] = null;
-                    return { score: -1000, move: cell };
+                    return { score: -100000, move: cell };
+                }
+                
+                // 检查玩家是否形成四连
+                if (this.checkPotentialFour(cell.row, cell.col, 'black')) {
+                    this.board[cell.row][cell.col] = null;
+                    return { score: -50000, move: cell };
                 }
                 
                 const result = this.minimax(depth - 1, alpha, beta, true);
@@ -2779,6 +2799,42 @@ class GomokuGame {
             
             return { score: minScore, move: bestMove };
         }
+    }
+    
+    // 检查是否形成四连
+    checkPotentialFour(row, col, player) {
+        const directions = [
+            [1, 0],   // 水平
+            [0, 1],   // 垂直
+            [1, 1],   // 对角线
+            [1, -1]   // 反对角线
+        ];
+        
+        for (const [dr, dc] of directions) {
+            let count = 1;
+            let i = row + dr;
+            let j = col + dc;
+            
+            while (i >= 0 && i < this.boardSize && j >= 0 && j < this.boardSize && this.board[i][j] === player) {
+                count++;
+                i += dr;
+                j += dc;
+            }
+            
+            i = row - dr;
+            j = col - dc;
+            while (i >= 0 && i < this.boardSize && j >= 0 && j < this.boardSize && this.board[i][j] === player) {
+                count++;
+                i -= dr;
+                j -= dc;
+            }
+            
+            if (count >= 4) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     evaluateBoard() {
@@ -3013,4 +3069,53 @@ class GomokuGame {
 // 初始化游戏
 window.onload = function() {
     window.game = new GomokuGame();
+};
+
+// 测试AI拦截四连的函数
+window.testAIIntercept = function() {
+    console.log('=== 测试AI拦截四连 ===');
+    
+    // 重置游戏
+    game.restartGame();
+    game.gameStatus = 'playing';
+    game.currentPlayer = 'black';
+    
+    // 创建四连场景：黑子在水平方向形成四连
+    const board = game.board;
+    board[7][5] = 'black'; // 黑子
+    board[7][6] = 'black'; // 黑子  
+    board[7][7] = 'black'; // 黑子
+    board[7][8] = 'black'; // 黑子 - 四连
+    board[7][9] = null;    // 空位（可以形成五连）
+    
+    // 白子在其他位置
+    board[6][6] = 'white';
+    board[8][8] = 'white';
+    
+    // 渲染棋盘
+    game.renderBoard();
+    
+    // 切换到AI回合
+    game.currentPlayer = 'white';
+    
+    // 获取AI的落子
+    console.log('当前棋盘状态:');
+    for (let i = 5; i < 10; i++) {
+        let row = '';
+        for (let j = 4; j < 10; j++) {
+            row += (board[i][j] || '.') + ' ';
+        }
+        console.log(row);
+    }
+    
+    console.log('AI正在思考...');
+    const move = game.getBestMove();
+    console.log('AI选择的落子位置:', move);
+    
+    // 检查AI是否拦截了四连
+    if (move.row === 7 && move.col === 9) {
+        console.log('✅ AI正确拦截了四连！');
+    } else {
+        console.log('❌ AI没有拦截四连，选择了其他位置');
+    }
 };
