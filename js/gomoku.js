@@ -63,7 +63,169 @@ class GomokuGame {
         // 加载训练数据
         this.loadTrainingData();
         
-        // AI对话内容库
+        // 对话历史管理
+        this.dialogHistory = [];
+        this.maxHistoryLength = 10; // 限制对话历史长度
+        
+        // 语气风格配置
+        this.toneStyles = {
+            friendly: {
+                prefix: "",
+                suffix: "！",
+                adjust: (text) => text.replace(/\./g, "！").replace(/，/g, "，")
+            },
+            professional: {
+                prefix: "",
+                suffix: "。",
+                adjust: (text) => text.replace(/！/g, "。")
+            },
+            enthusiastic: {
+                prefix: "哇！",
+                suffix: "！！",
+                adjust: (text) => text.replace(/\./g, "！")
+            },
+            calm: {
+                prefix: "",
+                suffix: "。",
+                adjust: (text) => text
+            }
+        };
+        
+        // 意图分类规则
+        this.intentRules = {
+            greet: [
+                /你好|您好|嗨|哈喽|hi|hello/i,
+                /开始|启动|准备|就绪/i
+            ],
+            askRule: [
+                /规则|怎么玩|怎么下|玩法|规则是什么/i,
+                /如何|怎样|怎么|应该/i
+            ],
+            askHelp: [
+                /帮助|帮忙|指导|提示|建议/i,
+                /不会|不懂|不明白|不知道/i
+            ],
+            expressFrustration: [
+                /不好|不行|太弱|太强|不公平|作弊/i,
+                /生气|恼火|烦|讨厌|失望/i
+            ],
+            askAboutAI: [
+                /你是|你叫|你是谁|你是什么/i,
+                /AI|智能|算法|原理|怎么想的/i
+            ],
+            askStatus: [
+                /状态|情况|怎么样|如何|进展/i,
+                /训练|学习|数据|存储/i
+            ],
+            makeSuggestion: [
+                /建议|建议你|应该|最好|最好是/i,
+                /改进|优化|调整|修改/i
+            ],
+            endGame: [
+                /结束|停止|退出|不玩了|再见/i,
+                /认输|投降|放弃/i
+            ]
+        };
+        
+        // 响应模板系统
+        this.responseTemplates = {
+            // 基础模板
+            base: {
+                greet: [
+                    "你好！很高兴和你下棋！",
+                    "嗨！准备好开始一局了吗？",
+                    "你好呀！我是你的五子棋AI对手！",
+                    "哈喽！希望我们能下出精彩的对局！"
+                ],
+                askRule: [
+                    "五子棋规则很简单：黑白双方轮流落子，先在一条直线上连成五个子的一方获胜！",
+                    "规则是轮流落子，先连成五子的人赢。横、竖、斜方向都可以哦！",
+                    "玩法很简单：双方交替落子，先在一条线上连成五个同色子的获胜！"
+                ],
+                askHelp: [
+                    "如果你是新手，可以尝试从中心开始下，控制棋盘的中心区域。",
+                    "防守时要注意对方的活三和冲四，进攻时要创造自己的优势。",
+                    "建议你观察棋盘的整体局势，不要只看局部。"
+                ],
+                expressFrustration: [
+                    "抱歉让你感到不满意，我会继续努力改进的！",
+                    "别灰心，我们再来一局，我相信你会做得更好！",
+                    "下棋就是这样，有输有赢，重要的是享受过程！"
+                ],
+                askAboutAI: [
+                    "我是一个基于规则和模式识别的五子棋AI，通过自我对弈不断学习提高。",
+                    "我会分析棋盘局势，评估每个位置的价值，然后选择最优的落子点。",
+                    "我通过分析棋型和位置来做出决策，希望能给你带来挑战！"
+                ],
+                askStatus: [
+                    "我已经分析了 {{totalGames}} 局对局，正在不断学习和进步！",
+                    "我的状态很好，随时可以和你下棋！",
+                    "我一直在学习新的策略，希望能给你带来不一样的体验！"
+                ],
+                makeSuggestion: [
+                    "谢谢你的建议！我会认真考虑的。",
+                    "好的，我会尝试改进这方面的表现。",
+                    "你的建议很有价值，我会在训练中注意这一点。"
+                ],
+                endGame: [
+                    "好的，随时等你来挑战！",
+                    "再见！希望你玩得开心！",
+                    "期待下次和你下棋！"
+                ],
+                default: [
+                    "我不太明白你的意思，我们来下棋吧！",
+                    "让我们专注于棋局，享受下棋的乐趣！",
+                    "有什么我可以帮助你的吗？"
+                ]
+            },
+            // 游戏状态相关模板
+            gameState: {
+                notStarted: {
+                    askHelp: [
+                        "游戏还没开始呢，点击棋盘开始一局吧！",
+                        "让我们先开始一局游戏，然后我可以给你一些建议。",
+                        "先开始下棋吧，我会在过程中给你提示的！"
+                    ],
+                    askRule: [
+                        "游戏还没开始，让我先给你介绍一下规则：五子棋是黑白双方轮流落子，先连成五子的一方获胜！",
+                        "在开始游戏前，告诉你规则：轮流落子，先在一条线上连成五个同色子的人赢！",
+                        "规则很简单，点击棋盘开始游戏后，我们轮流落子，先连成五子的获胜！"
+                    ]
+                },
+                ended: {
+                    greet: [
+                        "游戏已经结束了，我们再来一局吧！",
+                        "对局结束了，要重新开始吗？",
+                        "游戏结束啦，再来挑战我吧！"
+                    ],
+                    askStatus: [
+                        "游戏已经结束，我们可以再来一局！",
+                        "对局结束了，要重新开始挑战我吗？",
+                        "游戏结束啦，希望你玩得开心！再来一局吗？"
+                    ]
+                }
+            },
+            // 重复问题模板
+            repetition: {
+                askRule: [
+                    "五子棋的规则很简单：黑白双方轮流在15x15的棋盘上落子，先在一条直线（横、竖、斜）上连成五个同色子的一方获胜。",
+                    "规则是轮流落子，连成五子就赢。要注意防守对方的活三、冲四等棋型，同时创造自己的优势。",
+                    "玩法：双方交替落子，先连成五子的人获胜。建议从中心开始下，控制棋盘的关键位置。"
+                ],
+                askHelp: [
+                    "作为新手，建议你关注以下几点：1. 控制中心 2. 防守对方的威胁 3. 创造自己的进攻机会 4. 观察整体局势。",
+                    "下棋时要注意：防守对方的活三，自己创造活三，保持棋子的连接性，不要下孤立的棋子。",
+                    "给你几个小技巧：先占中心，保持棋子的连贯性，注意防守对方的冲四，创造自己的活四机会。"
+                ],
+                askAboutAI: [
+                    "我是一个基于规则和模式识别的五子棋AI。我会分析棋盘上的各种棋型，评估每个位置的价值，然后选择最优的落子点。",
+                    "我的决策过程包括：分析当前局势、评估各个位置的价值、考虑进攻和防守策略、选择最优落子点。",
+                    "我通过分析棋型（如活三、冲四等）和位置价值来做出决策，同时通过自我对弈不断学习和改进。"
+                ]
+            }
+        };
+        
+        // AI对话内容库（保留原有结构以保持兼容性）
         this.dialogues = {
             // 开局问候
             greeting: [
@@ -129,7 +291,9 @@ class GomokuGame {
                 "嗯，有点水平嘛！",
                 "这手棋有想法！",
                 "我得认真应对了~"
-            ]
+            ],
+            // 意图响应（保留以保持兼容性）
+            intentResponses: this.responseTemplates.base
         };
         
         this.initializeBoard();
@@ -166,6 +330,9 @@ class GomokuGame {
             setTimeout(() => {
                 dialogBubble.style.animation = 'fadeIn 0.3s ease-in-out';
             }, 10);
+            
+            // 添加AI响应到对话历史
+            this.addToDialogHistory('ai', message);
         }
     }
     
@@ -174,6 +341,183 @@ class GomokuGame {
         const dialogues = this.dialogues[category];
         if (!dialogues || dialogues.length === 0) return "";
         return dialogues[Math.floor(Math.random() * dialogues.length)];
+    }
+    
+    // 添加对话到历史记录
+    addToDialogHistory(role, content) {
+        this.dialogHistory.push({
+            role: role,
+            content: content,
+            timestamp: Date.now()
+        });
+        
+        // 限制历史记录长度
+        if (this.dialogHistory.length > this.maxHistoryLength) {
+            this.dialogHistory.shift();
+        }
+    }
+    
+    // 分析用户意图
+    analyzeUserIntent(input) {
+        for (const [intent, patterns] of Object.entries(this.intentRules)) {
+            for (const pattern of patterns) {
+                if (pattern.test(input)) {
+                    return intent;
+                }
+            }
+        }
+        return 'default';
+    }
+    
+    // 决策逻辑系统 - 根据上下文确定响应策略
+    determineResponseStrategy(intent, input) {
+        // 考虑多种因素来确定响应策略
+        const strategy = {
+            intent: intent,
+            gameState: this.gameStatus,
+            moveCount: this.moveNumber,
+            hasRecentSameIntent: false,
+            hasGameStarted: this.gameStatus === 'playing',
+            isGameEnded: this.gameStatus === 'ended',
+            responseType: 'normal'
+        };
+        
+        // 检查最近的对话历史
+        if (this.dialogHistory.length > 0) {
+            const recentHistory = this.dialogHistory.slice(-3);
+            
+            // 检查是否有重复的问题
+            strategy.hasRecentSameIntent = recentHistory.some(item => 
+                item.role === 'user' && this.analyzeUserIntent(item.content) === intent
+            );
+            
+            // 检查是否有连续的相同意图
+            const consecutiveSameIntent = recentHistory.filter(item => 
+                item.role === 'user' && this.analyzeUserIntent(item.content) === intent
+            ).length;
+            
+            if (consecutiveSameIntent >= 2) {
+                strategy.responseType = 'repetition';
+            }
+        }
+        
+        // 根据游戏状态调整策略
+        if (strategy.isGameEnded) {
+            strategy.responseType = 'gameEnded';
+        } else if (!strategy.hasGameStarted) {
+            strategy.responseType = 'gameNotStarted';
+        }
+        
+        return strategy;
+    }
+    
+    // 替换模板变量
+    replaceTemplateVariables(template) {
+        return template
+            .replace(/\{\{totalGames\}\}/g, this.aiTraining.totalGamesAnalyzed)
+            .replace(/\{\{boardSize\}\}/g, this.boardSize)
+            .replace(/\{\{gameStatus\}\}/g, this.gameStatus === 'playing' ? '进行中' : this.gameStatus === 'ended' ? '已结束' : '未开始');
+    }
+    
+    // 获取上下文相关的响应
+    getContextualResponse(intent, input) {
+        // 确定响应策略
+        const strategy = this.determineResponseStrategy(intent, input);
+        
+        // 根据策略选择响应模板
+        let responses;
+        
+        // 1. 首先检查游戏状态相关模板
+        if (strategy.isGameEnded && this.responseTemplates.gameState.ended[intent]) {
+            responses = this.responseTemplates.gameState.ended[intent];
+        } else if (!strategy.hasGameStarted && this.responseTemplates.gameState.notStarted[intent]) {
+            responses = this.responseTemplates.gameState.notStarted[intent];
+        }
+        // 2. 检查重复问题模板
+        else if (strategy.responseType === 'repetition' && this.responseTemplates.repetition[intent]) {
+            responses = this.responseTemplates.repetition[intent];
+        }
+        // 3. 使用基础模板
+        else {
+            responses = this.responseTemplates.base[intent] || this.responseTemplates.base.default;
+        }
+        
+        // 随机选择响应
+        let response = responses[Math.floor(Math.random() * responses.length)];
+        
+        // 避免重复响应
+        if (this.dialogHistory.length > 0) {
+            const lastAIResponse = this.dialogHistory
+                .filter(item => item.role === 'ai')
+                .slice(-1)[0];
+            
+            if (lastAIResponse) {
+                const alternativeResponses = responses.filter(r => 
+                    this.replaceTemplateVariables(r) !== lastAIResponse.content
+                );
+                if (alternativeResponses.length > 0) {
+                    response = alternativeResponses[Math.floor(Math.random() * alternativeResponses.length)];
+                }
+            }
+        }
+        
+        // 替换模板变量
+        response = this.replaceTemplateVariables(response);
+        
+        return response;
+    }
+    
+    // 根据上下文选择语气风格
+    selectToneStyle(intent, strategy) {
+        // 根据意图和游戏状态选择语气
+        if (intent === 'expressFrustration') {
+            // 当用户表达不满时，使用冷静的语气
+            return 'calm';
+        } else if (intent === 'greet' || intent === 'makeSuggestion') {
+            // 问候和建议时使用友好的语气
+            return 'friendly';
+        } else if (intent === 'askAboutAI' || intent === 'askRule') {
+            // 询问AI或规则时使用专业的语气
+            return 'professional';
+        } else if (strategy.gameState === 'playing' && this.moveNumber < 5) {
+            // 游戏开始时使用热情的语气
+            return 'enthusiastic';
+        } else {
+            // 默认使用友好语气
+            return 'friendly';
+        }
+    }
+    
+    // 调整响应语气
+    adjustTone(response, toneStyle) {
+        const style = this.toneStyles[toneStyle] || this.toneStyles.friendly;
+        return style.prefix + style.adjust(response) + style.suffix;
+    }
+    
+    // 处理用户输入
+    handleUserInput(input) {
+        // 添加用户输入到对话历史
+        this.addToDialogHistory('user', input);
+        
+        // 分析用户意图
+        const intent = this.analyzeUserIntent(input);
+        
+        // 确定响应策略
+        const strategy = this.determineResponseStrategy(intent, input);
+        
+        // 选择语气风格
+        const toneStyle = this.selectToneStyle(intent, strategy);
+        
+        // 获取上下文相关的响应
+        let response = this.getContextualResponse(intent, input);
+        
+        // 调整响应语气
+        response = this.adjustTone(response, toneStyle);
+        
+        // 显示响应
+        this.showDialog(response);
+        
+        return { intent, response, toneStyle };
     }
     
     // ==================== IndexedDB存储方法 ====================
@@ -1123,6 +1467,32 @@ class GomokuGame {
         
         if (closeResultBtn) {
             closeResultBtn.addEventListener('click', () => this.closeTrainingResult());
+        }
+        
+        // 用户输入处理
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        
+        if (userInput && sendButton) {
+            // 发送按钮点击事件
+            sendButton.addEventListener('click', () => {
+                const input = userInput.value.trim();
+                if (input) {
+                    this.handleUserInput(input);
+                    userInput.value = '';
+                }
+            });
+            
+            // 回车事件
+            userInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const input = userInput.value.trim();
+                    if (input) {
+                        this.handleUserInput(input);
+                        userInput.value = '';
+                    }
+                }
+            });
         }
         
         // 初始化存储空间显示
