@@ -1,0 +1,7 @@
+# 重定向规则
+
+# 将根路径重定向到index.html
+/ /index.html 200
+
+# 处理404错误
+/* /index.html 404

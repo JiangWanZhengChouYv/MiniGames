@@ -172,7 +172,27 @@
     </style>
 
     <script src="js/storage.js"></script>
+    <script src="js/cache-monitor.js"></script>
     <script>
+        // 初始化缓存监控
+        let cacheMonitor;
+        if (typeof CacheMonitor !== 'undefined') {
+            cacheMonitor = new CacheMonitor();
+        }
+    
+        // 注册Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then((registration) => {
+                        console.log('Service Worker 注册成功:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker 注册失败:', error);
+                    });
+            });
+        }
+    
         // 加载排行榜
         function loadLeaderboard() {
             const leaderboardHTML = `
@@ -236,7 +256,18 @@
         }
         
         // 页面加载完成后显示排行榜
-        window.addEventListener('load', loadLeaderboard);
+        window.addEventListener('load', () => {
+            // 清理过期数据
+            if (typeof GameStorage !== 'undefined' && GameStorage.cleanupExpiredData) {
+                GameStorage.cleanupExpiredData();
+            }
+            // 压缩存储数据
+            if (typeof GameStorage !== 'undefined' && GameStorage.compressData) {
+                GameStorage.compressData();
+            }
+            // 加载排行榜
+            loadLeaderboard();
+        });
         
         // 显示 README 模态框
         function showReadme() {

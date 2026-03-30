@@ -734,6 +734,27 @@
     </div>
     
     <script src="../js/storage.js"></script>
+    <script src="../js/cache-monitor.js"></script>
+    <script>
+        // 初始化缓存监控
+        let cacheMonitor;
+        if (typeof CacheMonitor !== 'undefined') {
+            cacheMonitor = new CacheMonitor();
+        }
+        
+        // 注册Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then((registration) => {
+                        console.log('Service Worker 注册成功:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker 注册失败:', error);
+                    });
+            });
+        }
+    </script>
     <script src="../js/gomoku.js"></script>
 </body>
 </html>
