@@ -509,6 +509,9 @@ class GomokuGame {
             const usage = this.getStorageUsage();
             const percentage = this.getStoragePercentage();
             console.log(`对弈记录已保存。存储使用: ${this.formatStorageSize(usage)} (${percentage.toFixed(2)}%)`);
+            
+            // 更新存储空间UI
+            this.updateStorageUI();
         } catch (error) {
             console.error('保存对弈记录失败:', error);
             // 如果是存储空间不足错误，尝试清理后重试
@@ -1408,8 +1411,10 @@ class GomokuGame {
         // 按评分排序
         scoredPositions.sort((a, b) => b.score - a.score);
         
-        // 返回评分最高的位置
-        return scoredPositions[0];
+        // 添加一些随机性，从top 3中随机选择，增加游戏的多样性
+        const topPositions = scoredPositions.slice(0, 3);
+        const randomIndex = Math.floor(Math.random() * topPositions.length);
+        return topPositions[randomIndex];
     }
     
     // 评估位置的分数
