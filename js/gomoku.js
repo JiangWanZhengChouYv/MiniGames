@@ -1707,7 +1707,11 @@ class GomokuGame {
     // 模拟自我对弈
     async simulateSelfGame(firstPlayer = 'black') {
         try {
-            // 创建一个临时棋盘
+            // 保存当前棋盘状态，以便自我对弈结束后恢复
+            const savedBoard = this.board.map(row => [...row]);
+            const savedGameStatus = this.gameStatus;
+            
+            // 创建一个临时棋盘用于自我对弈计算
             const tempBoard = Array(this.boardSize).fill(null).map(() => Array(this.boardSize).fill(null));
             const moves = [];
             let currentPlayer = firstPlayer;
@@ -1736,12 +1740,8 @@ class GomokuGame {
                         break; // 没有可用位置
                     }
                     
-                    // 落子到临时棋盘
+                    // 落子到临时棋盘（仅用于计算，不修改实际棋盘）
                     tempBoard[move.row][move.col] = currentPlayer;
-                    
-                    // 同时更新实际棋盘用于可视化
-                    this.board[move.row][move.col] = currentPlayer;
-                    this.renderBoard();
                     
                     moves.push({ 
                         player: currentPlayer, 
@@ -1764,12 +1764,8 @@ class GomokuGame {
                     // 切换玩家
                     currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
                     
-                    // 添加延迟，使用户可以观察到落子过程，但减少延迟时间
-                    await new Promise(resolve => setTimeout(resolve, 10)); // 10ms延迟，保持可视化效果的同时提高速度
-                    
-                    // 添加随机延迟，模拟AI思考时间，使时间数据更加真实
-                    const randomDelay = Math.floor(Math.random() * 5) + 1; // 1-5ms的随机延迟，减少整体延迟
-                    await new Promise(resolve => setTimeout(resolve, randomDelay));
+                    // 添加延迟，让出时间片，避免阻塞UI
+                    await new Promise(resolve => setTimeout(resolve, 5));
                 } catch (stepError) {
                     console.error('自我对弈步骤错误:', stepError);
                     // 继续下一局，不影响整体训练
@@ -1782,8 +1778,9 @@ class GomokuGame {
             // 检查是否被取消
             if (this.autoLearnState.cancelRequested) {
                 console.log('取消后不保存游戏记录');
-                // 清空棋盘
-                this.initializeBoard();
+                // 恢复原始棋盘状态
+                this.board = savedBoard;
+                this.gameStatus = savedGameStatus;
                 this.renderBoard();
                 return {
                     gameId: null,
@@ -1807,8 +1804,9 @@ class GomokuGame {
             // 保存游戏记录
             await this.saveGameRecord(gameRecord);
             
-            // 清空棋盘，为下一局做准备
-            this.initializeBoard();
+            // 恢复原始棋盘状态
+            this.board = savedBoard;
+            this.gameStatus = savedGameStatus;
             this.renderBoard();
             
             return {
@@ -1819,8 +1817,9 @@ class GomokuGame {
             };
         } catch (error) {
             console.error('自我对弈过程中发生错误:', error);
-            // 清空棋盘
+            // 恢复原始棋盘状态
             this.initializeBoard();
+            this.gameStatus = 'ready';
             this.renderBoard();
             return {
                 gameId: null,
