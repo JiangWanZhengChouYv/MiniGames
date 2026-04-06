@@ -610,9 +610,9 @@ class GomokuGame {
         }
     }
     
-    // 返回512MB的限制
+    // 返回100MB的限制
     getStorageLimit() {
-        return 536870912; // 512MB = 512 * 1024 * 1024
+        return 104857600; // 100MB = 100 * 1024 * 1024
     }
     
     // 计算已使用空间的百分比
@@ -2705,8 +2705,8 @@ class GomokuGame {
             return openingMove;
         }
         
-        // 增加搜索深度，提高AI智能，增加CPU占用
-        const depth = 5;
+        // 增加搜索深度，提高AI智能
+        const depth = 4;
         const result = this.minimax(depth, -Infinity, Infinity, true);
         return result.move;
     }
@@ -2809,102 +2809,17 @@ class GomokuGame {
     evaluateBoard() {
         let score = 0;
         
-        // 评估AI的优势（增强版）
-        score += this.evaluatePlayer('white') * 1.2;
-        // 评估玩家的优势（增强版）
-        score -= this.evaluatePlayer('black') * 1.2;
-        
-        // 增强的中心位置评估
-        score += this.evaluateCenterControl('white') - this.evaluateCenterControl('black');
-        
-        // 增强的连接性评估
-        score += this.evaluateConnectivity('white') - this.evaluateConnectivity('black');
-        
-        // 增强的潜在机会评估
-        score += this.evaluatePotentialMoves('white') - this.evaluatePotentialMoves('black');
+        // 评估AI的优势
+        score += this.evaluatePlayer('white');
+        // 评估玩家的优势
+        score -= this.evaluatePlayer('black');
         
         // 如果已训练，应用用户偏好位置的防守权重
         if (this.aiTraining.isTrained) {
-            score += this.applyUserPreferenceDefense() * 1.5;
+            score += this.applyUserPreferenceDefense();
         }
         
         return score;
-    }
-    
-    // 评估中心控制
-    evaluateCenterControl(player) {
-        let centerScore = 0;
-        const centerRow = Math.floor(this.boardSize / 2);
-        const centerCol = Math.floor(this.boardSize / 2);
-        
-        for (let i = 0; i < this.boardSize; i++) {
-            for (let j = 0; j < this.boardSize; j++) {
-                if (this.board[i][j] === player) {
-                    const distance = Math.sqrt(Math.pow(i - centerRow, 2) + Math.pow(j - centerCol, 2));
-                    const bonus = Math.max(0, 30 - distance * 3);
-                    centerScore += bonus;
-                }
-            }
-        }
-        
-        return centerScore;
-    }
-    
-    // 评估棋子的连接性
-    evaluateConnectivity(player) {
-        let connectivityScore = 0;
-        const directions = [[1,0],[0,1],[1,1],[1,-1]];
-        
-        for (let i = 0; i < this.boardSize; i++) {
-            for (let j = 0; j < this.boardSize; j++) {
-                if (this.board[i][j] === player) {
-                    for (const [dr, dc] of directions) {
-                        let count = 1;
-                        let x = i + dr;
-                        let y = j + dc;
-                        
-                        while (x >= 0 && x < this.boardSize && y >= 0 && y < this.boardSize && this.board[x][y] === player) {
-                            count++;
-                            x += dr;
-                            y += dc;
-                        }
-                        
-                        x = i - dr;
-                        y = j - dc;
-                        while (x >= 0 && x < this.boardSize && y >= 0 && y < this.boardSize && this.board[x][y] === player) {
-                            count++;
-                            x -= dr;
-                            y -= dc;
-                        }
-                        
-                        if (count > 1) {
-                            connectivityScore += count * count * 2;
-                        }
-                    }
-                }
-            }
-        }
-        
-        return connectivityScore;
-    }
-    
-    // 评估潜在的进攻机会
-    evaluatePotentialMoves(player) {
-        let potentialScore = 0;
-        
-        for (let i = 0; i < this.boardSize; i++) {
-            for (let j = 0; j < this.boardSize; j++) {
-                if (this.board[i][j] === null) {
-                    // 临时放置棋子进行评估
-                    this.board[i][j] = player;
-                    const tempScore = this.evaluatePosition(i, j, player);
-                    this.board[i][j] = null;
-                    potentialScore += tempScore * 0.2;
-                }
-            }
-        }
-        
-        return potentialScore;
     }
     
     // 应用用户偏好位置的防守权重
